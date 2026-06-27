@@ -102,9 +102,19 @@ function preTourLockMs() {
 }
 function isPreTourLocked() { return Date.now() >= preTourLockMs(); }
 
+// Clé de tri = nom de famille (tout ce qui suit le prénom), insensible à la casse/accents.
+// Gère les noms composés (« van der Poel », « De Lie », « Kragh Andersen »…).
+function lastNameKey(name) {
+  const parts = String(name || '').trim().split(/\s+/);
+  return (parts.length > 1 ? parts.slice(1).join(' ') : parts[0] || '');
+}
+function byLastName(a, b) {
+  return lastNameKey(a.name).localeCompare(lastNameKey(b.name), 'fr', { sensitivity: 'base' });
+}
+
 // selects
 function riderSelect(name, sel, ph = '— Choisir un coureur —', attrs = '') {
-  const rs = [...db.riders].sort((a, b) => a.name.localeCompare(b.name));
+  const rs = [...db.riders].sort(byLastName);
   return `<select name="${esc(name)}" ${attrs}><option value="">${esc(ph)}</option>${rs.map(r =>
     `<option value="${esc(r.id)}" ${r.id === sel ? 'selected' : ''}>${esc(r.name)}${r.nationality ? ' (' + esc(r.nationality) + ')' : ''}</option>`).join('')}</select>`;
 }
@@ -793,7 +803,7 @@ function renderRidersTab() {
   const teams = [...db.teams].sort((a, b) => a.name.localeCompare(b.name));
   let html = '';
   if (orgaCode) html += `<div class="inline-form"><div class="inline-form-title">Ajouter un coureur</div><div class="grid-2" style="gap:8px;margin-bottom:8px"><div class="form-group"><label>Nom</label><input type="text" id="nrName" maxlength="60"></div><div class="form-group"><label>Nationalité</label><input type="text" id="nrNat" maxlength="10"></div><div class="form-group"><label>Équipe</label><select id="nrTeam"><option value="">— Sans équipe —</option>${teams.map(t => `<option value="${esc(t.id)}">${esc(t.name)}</option>`).join('')}</select></div></div><button class="btn btn-primary" onclick="orgaAddRider()">Ajouter</button></div>`;
-  const rs = [...db.riders].sort((a, b) => a.name.localeCompare(b.name));
+  const rs = [...db.riders].sort(byLastName);
   html += `<div class="card" style="overflow-x:auto"><table><thead><tr><th>Coureur</th><th>Nat.</th><th>Équipe</th>${orgaCode ? '<th></th>' : ''}</tr></thead><tbody>`;
   rs.forEach(r => {
     html += `<tr><td><strong>${esc(r.name)}</strong></td><td style="color:var(--muted)">${esc(r.nationality || '—')}</td><td>${esc(getTeamName(r.teamId))}</td>${orgaCode ? `<td class="td-actions"><button class="btn btn-sm btn-danger" onclick="orgaDelRider('${r.id}')">🗑️</button></td>` : ''}</tr>`;
