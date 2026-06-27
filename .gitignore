@@ -1,0 +1,6 @@
+.claude/
+data_init.json
+seed.sql
+seed.json
+node_modules/
+.DS_Store
