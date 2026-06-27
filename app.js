@@ -549,16 +549,40 @@ async function savePreTour(e) {
 // ================================================================
 // ONGLET : PAR ÉTAPE (mes pronos)
 // ================================================================
+function spStatusHTML() {
+  const done = db.stages.filter(s => myStages[s.id]).length;
+  const total = db.stages.length;
+  const chips = db.stages.map(s => {
+    const locked = isStageLocked(s);
+    const has = !!myStages[s.id];
+    const cls = locked ? 'sp-chip locked' : has ? 'sp-chip done' : 'sp-chip todo';
+    const icon = locked ? '🔒' : has ? '✅' : '○';
+    return `<button class="${cls}" onclick="selectStage('${s.id}')" title="${esc(s.title)}${locked ? ' (verrouillée)' : has ? ' (pronostiquée — cliquer pour modifier)' : ' (à pronostiquer)'}">É${s.number} ${icon}</button>`;
+  }).join('');
+  return `<div class="alert alert-info" style="margin-bottom:10px">Tu as pronostiqué <strong>${done}/${total}</strong> étapes. Clique sur une étape pour la remplir ou la <strong>modifier</strong> (tant qu'elle n'a pas commencé).<br><span style="font-size:12px;color:var(--muted)">✅ pronostiquée · ○ à faire · 🔒 verrouillée</span></div>
+    <div class="sp-chips">${chips}</div>`;
+}
+
 function renderStagePronostics(el) {
   if (!session) { el.innerHTML = `<div class="alert alert-info">Connecte-toi pour pronostiquer. <button class="btn btn-sm btn-primary" onclick="openAuth('login')">Se connecter</button></div>`; return; }
   if (!session.approved) { el.innerHTML = pendingBanner(); return; }
 
   let html = `<div class="section-header"><div class="section-title">📝 Mes pronostics par étape</div></div>
-    <div class="form-group" style="max-width:420px"><label>Étape</label>
+    <div id="spStatus">${spStatusHTML()}</div>
+    <div class="form-group" style="max-width:480px"><label>Étape</label>
       <select id="spStage" onchange="renderStageForm()"><option value="">— Choisir une étape —</option>
-      ${db.stages.map(s => `<option value="${s.id}">[É${s.number}] ${esc(s.title)} — ${formatDate(s.date)} ${isStageLocked(s) ? '🔒' : '🟢'}</option>`).join('')}
+      ${db.stages.map(s => `<option value="${s.id}">[É${s.number}] ${esc(s.title)} — ${formatDate(s.date)} ${isStageLocked(s) ? '🔒' : myStages[s.id] ? '✅' : '🟢'}</option>`).join('')}
       </select></div><div id="spArea"></div>`;
   el.innerHTML = html;
+}
+
+function selectStage(id) {
+  const sel = document.getElementById('spStage');
+  if (!sel) return;
+  sel.value = id;
+  renderStageForm();
+  const area = document.getElementById('spArea');
+  if (area) area.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function renderStageForm() {
@@ -618,6 +642,10 @@ async function saveStage(e, stageId) {
     await rpc('save_stage_prediction', { p_token: session.token, p_stage_id: stageId, p_data: data });
     myStages[stageId] = data; db.stagePredictions[session.id + '_' + stageId] = data;
     showToast('Pronostic enregistré !', 'success');
+    // rafraîchir les marqueurs de statut + la liste déroulante
+    const st = document.getElementById('spStatus'); if (st) st.innerHTML = spStatusHTML();
+    const opt = document.querySelector(`#spStage option[value="${stageId}"]`);
+    if (opt && !/✅/.test(opt.textContent)) opt.textContent = opt.textContent.replace(/🟢$/, '✅');
   } catch (err) { showToast(err.message, 'error'); }
 }
 
@@ -971,7 +999,7 @@ async function init() {
   // Expose pour onclick inline
   Object.assign(window, {
     showTab, openAuth, doRegister, doLogin, logout, toggleOrga, closeModal,
-    savePreTour, renderStageForm, saveStage, onStageWinnerChange,
+    savePreTour, renderStageForm, saveStage, onStageWinnerChange, selectStage,
     renderScoreDetailContent, switchRiderTab,
     orgaAddTeam, orgaDelTeam, orgaAddRider, orgaDelRider,
     orgaStageModal, orgaSaveStage,

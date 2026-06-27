@@ -489,6 +489,31 @@ tr:hover td { background: rgba(255,255,255,0.03); }
 .sub-tab-btn:hover { color: var(--text); }
 .sub-tab-btn.active { border-bottom-color: var(--yellow); color: var(--yellow); font-weight: 700; }
 
+/* STAGE PREDICTION CHIPS */
+.sp-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 18px;
+}
+.sp-chip {
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.sp-chip:hover { border-color: var(--yellow); }
+.sp-chip.done { border-color: var(--green); color: var(--green); background: rgba(46,204,113,0.08); }
+.sp-chip.todo { color: var(--muted); }
+.sp-chip.locked { opacity: 0.55; cursor: pointer; border-style: dashed; }
+
 /* TYPE COLORS */
 .type-plaine { color: #3498db; }
 .type-accidentee { color: #e67e22; }
