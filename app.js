@@ -340,6 +340,56 @@ async function refreshWhoami() {
   } catch { /* ignore */ }
 }
 
+// ================================================================
+// BUG REPORT
+// ================================================================
+const BUG_WA = '32473453924';
+const BUG_EMAIL = 'etienne.depryck@gmail.com';
+
+function openBugReport() {
+  const pseudo = session ? session.name : '';
+  const pages = ['Accueil', 'Pronostics — Avant départ', 'Pronostics — Par étape', 'Classement', 'Détail des scores', 'Coureurs', 'Étapes', 'Règlement', 'Inscription / Connexion', 'Autre'];
+  showModal(`
+    <div class="card-title" style="margin-bottom:14px">🐛 Signaler un problème</div>
+    <div class="form-group">
+      <label>Ton pseudo</label>
+      <input type="text" id="bugPseudo" maxlength="60" value="${esc(pseudo)}" placeholder="Ton nom dans l'app">
+    </div>
+    <div class="form-group">
+      <label>Où as-tu rencontré le problème ?</label>
+      <select id="bugPage">
+        ${pages.map(p => `<option value="${p}">${p}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Description du problème</label>
+      <textarea id="bugDesc" rows="5" maxlength="1000" placeholder="Décris le problème, ce que tu as fait, ce qui s'est passé…"></textarea>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+      <button class="btn btn-primary" style="flex:1;min-width:140px" onclick="submitBugReport('whatsapp')">📲 Envoyer via WhatsApp</button>
+      <button class="btn btn-outline" style="flex:1;min-width:140px" onclick="submitBugReport('email')">📧 Envoyer par email</button>
+    </div>
+    <button class="btn btn-outline" style="width:100%;margin-top:8px" onclick="closeModal()">Annuler</button>
+  `);
+}
+
+function submitBugReport(via) {
+  const pseudo = (document.getElementById('bugPseudo')?.value || '').trim() || 'Inconnu';
+  const page = document.getElementById('bugPage')?.value || '?';
+  const desc = (document.getElementById('bugDesc')?.value || '').trim();
+  if (!desc) { showToast('Décris le problème avant d\'envoyer', 'error'); return; }
+  if (via === 'whatsapp') {
+    const msg = `🐛 *Bug – Pronostics Tour 2026*\n👤 Joueur : ${pseudo}\n📍 Page : ${page}\n📝 ${desc}`;
+    window.open(`https://wa.me/${BUG_WA}?text=${encodeURIComponent(msg)}`, '_blank');
+  } else {
+    const subj = `[Bug] Pronostics Tour 2026 – ${page}`;
+    const body = `Joueur : ${pseudo}\nPage : ${page}\n\nDescription :\n${desc}`;
+    window.open(`mailto:${BUG_EMAIL}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`, '_blank');
+  }
+  closeModal();
+  showToast('Merci pour ton retour !', 'success');
+}
+
 function openAuth(mode) {
   const isReg = mode === 'register';
   showModal(`
@@ -424,6 +474,7 @@ function renderShell() {
   // Header
   const ha = document.getElementById('headerActions');
   let h = '';
+  h += `<button class="btn btn-sm btn-outline" onclick="openBugReport()" title="Signaler un problème">🐛 Bug</button>`;
   if (session) {
     const badge = session.approved ? '' : ' <span class="badge badge-red" style="margin-left:4px">en attente</span>';
     h += `<span style="font-size:13px;color:var(--text);margin-right:4px">👤 <strong>${esc(session.name)}</strong>${badge}</span>`;
@@ -1305,7 +1356,7 @@ async function init() {
 
   // Expose pour onclick inline
   Object.assign(window, {
-    showTab, openAuth, doRegister, doLogin, logout, toggleOrga, closeModal,
+    showTab, openAuth, doRegister, doLogin, logout, toggleOrga, closeModal, openBugReport, submitBugReport,
     renderPronos, showPronosSub, goPronos, resetPreTour, resetStage,
     savePreTour, renderStageForm, saveStage, onStageWinnerChange, onPreTourWinnerChange, selectStage,
     renderScoreDetailContent, switchRiderTab,
