@@ -87,6 +87,22 @@ function closeModal() { document.getElementById('modal').style.display = 'none';
 function getRiderName(id) { const r = db.riders.find(r => r.id === id); return r ? riderDisplay(r.name) : (id ? '?' : '—'); }
 function getTeamName(id) { const t = db.teams.find(t => t.id === id); return t ? t.name : (id ? '?' : '—'); }
 
+// Porteurs actuels des maillots = d'après le résultat de la dernière étape encodée
+function currentJerseys() {
+  const done = db.stages.filter(s => db.stageResults[s.id]).sort((a, b) => (b.number || 0) - (a.number || 0));
+  if (!done.length) return {};
+  const r = db.stageResults[done[0].id] || {};
+  return { yellow: r.yellowJerseyAfter, green: r.greenJerseyAfter, polka: r.polkaJerseyAfter, white: r.whiteJerseyAfter };
+}
+function riderJerseyBadges(id, j) {
+  let s = '';
+  if (j.yellow === id) s += ' <span title="Maillot jaune">🟡</span>';
+  if (j.green === id) s += ' <span title="Maillot vert">🟢</span>';
+  if (j.polka === id) s += ' <span title="Maillot à pois">🔴</span>';
+  if (j.white === id) s += ' <span title="Maillot blanc">⚪</span>';
+  return s;
+}
+
 function formatDate(dateStr) {
   if (!dateStr) return '—';
   const d = new Date(dateStr + 'T12:00:00');
@@ -804,14 +820,58 @@ function renderTeamsTab() {
   let html = '';
   if (orgaCode) html += `<div class="inline-form"><div class="inline-form-title">Ajouter une équipe</div><div class="form-row"><div class="form-group"><label>Nom</label><input type="text" id="ntName" maxlength="60"></div><button class="btn btn-primary" onclick="orgaAddTeam()">Ajouter</button></div></div>`;
   const ts = [...db.teams].sort((a, b) => a.name.localeCompare(b.name));
-  html += `<div class="card"><table><thead><tr><th>Équipe</th><th>Coureurs</th>${orgaCode ? '<th></th>' : ''}</tr></thead><tbody>`;
+  html += `<div class="alert alert-info" style="margin-bottom:10px">Clique sur une équipe pour voir son effectif (leader ⭐, statut, maillots).</div>`;
+  html += `<div class="card"><table><thead><tr><th>Équipe</th><th>Coureurs</th><th>Abandons</th>${orgaCode ? '<th></th>' : ''}</tr></thead><tbody>`;
   ts.forEach(t => {
-    const n = db.riders.filter(r => r.teamId === t.id).length;
-    html += `<tr><td><strong>${esc(t.name)}</strong></td><td><span class="badge badge-blue">${n}</span></td>${orgaCode ? `<td class="td-actions">${n === 0 ? `<button class="btn btn-sm btn-danger" onclick="orgaDelTeam('${t.id}')">🗑️</button>` : ''}</td>` : ''}</tr>`;
+    const team = db.riders.filter(r => r.teamId === t.id);
+    const n = team.length;
+    const out = team.filter(r => r.active === false).length;
+    html += `<tr style="cursor:pointer" onclick="renderTeamDetail('${t.id}')"><td><strong style="color:var(--yellow)">${esc(t.name)} ›</strong></td><td><span class="badge badge-blue">${n}</span></td><td>${out ? `<span class="badge badge-red">${out}</span>` : '<span style="color:var(--muted)">—</span>'}</td>${orgaCode ? `<td class="td-actions" onclick="event.stopPropagation()">${n === 0 ? `<button class="btn btn-sm btn-danger" onclick="orgaDelTeam('${t.id}')">🗑️</button>` : ''}</td>` : ''}</tr>`;
   });
   html += `</tbody></table></div>`;
   sc.innerHTML = html;
 }
+function renderTeamDetail(teamId) {
+  const sc = document.getElementById('ridersSub');
+  if (!sc) return;
+  const team = db.teams.find(t => t.id === teamId);
+  if (!team) { renderTeamsTab(); return; }
+  const j = currentJerseys();
+  const riders = db.riders.filter(r => r.teamId === teamId).sort((a, b) => {
+    const al = team.leader_id === a.id, bl = team.leader_id === b.id;
+    if (al !== bl) return al ? -1 : 1;
+    return byLastName(a, b);
+  });
+
+  let html = `<button class="btn btn-sm btn-outline" onclick="switchRiderTab('teams')">← Toutes les équipes</button>`;
+  html += `<div class="card" style="margin-top:12px"><div class="card-title">${esc(team.name)} · ${riders.length} coureurs</div>`;
+  html += `<div style="font-size:11px;color:var(--muted);margin-bottom:10px">Maillots : 🟡 jaune · 🟢 vert · 🔴 à pois · ⚪ blanc · ⭐ leader</div>`;
+  if (!riders.length) html += `<div style="color:var(--muted)">Aucun coureur</div>`;
+  else {
+    html += `<table><tbody>`;
+    riders.forEach(r => {
+      const out = r.active === false;
+      const isLeader = team.leader_id === r.id;
+      html += `<tr style="${out ? 'opacity:.6' : ''}">
+        <td>${isLeader ? '⭐ ' : ''}<strong style="${out ? 'color:var(--red)' : ''}">${esc(riderDisplay(r.name))}</strong>${r.nationality ? ` <span style="color:var(--muted);font-size:11px">${esc(r.nationality)}</span>` : ''}${riderJerseyBadges(r.id, j)} ${out ? '<span class="badge badge-red">ABANDON</span>' : '<span class="badge badge-green">actif</span>'}${isLeader ? ' <span class="badge badge-yellow">Leader</span>' : ''}</td>
+        ${orgaCode ? `<td class="td-actions">${isLeader ? `<button class="btn btn-sm btn-outline" onclick="orgaSetLeader('${teamId}','')">retirer ⭐</button>` : `<button class="btn btn-sm btn-outline" onclick="orgaSetLeader('${teamId}','${r.id}')">⭐ Leader</button>`} <button class="btn btn-sm btn-outline" onclick="orgaToggleRider('${r.id}',${out},'${teamId}')">${out ? '✅' : '⛔'}</button></td>` : ''}
+      </tr>`;
+    });
+    html += `</tbody></table>`;
+  }
+  html += `</div>`;
+  sc.innerHTML = html;
+}
+
+async function orgaSetLeader(teamId, riderId) {
+  try {
+    await rpc('admin_set_team_leader', { p_code: orgaCode, p_team_id: teamId, p_rider_id: riderId });
+    await reloadRef();
+    renderTeamDetail(teamId);
+    showToast(riderId ? 'Leader défini ⭐' : 'Leader retiré', 'success');
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
 function renderRidersTab() {
   const sc = document.getElementById('ridersSub');
   const teams = [...db.teams].sort((a, b) => a.name.localeCompare(b.name));
@@ -837,10 +897,11 @@ async function orgaAddRider() {
   try { await rpc('admin_upsert_rider', { p_code: orgaCode, p_id: '', p_name: name, p_nat: nat, p_team_id: team }); await reloadRef(); renderRidersTab(); showToast('Coureur ajouté', 'success'); } catch (e) { showToast(e.message, 'error'); }
 }
 async function orgaDelRider(id) { if (!confirm('Supprimer ce coureur ?')) return; try { await rpc('admin_delete_rider', { p_code: orgaCode, p_id: id }); await reloadRef(); renderRidersTab(); showToast('Supprimé', 'success'); } catch (e) { showToast(e.message, 'error'); } }
-async function orgaToggleRider(id, currentlyOut) {
+async function orgaToggleRider(id, currentlyOut, teamId) {
   try {
     await rpc('admin_set_rider_active', { p_code: orgaCode, p_rider_id: id, p_active: currentlyOut });
-    await reloadRef(); renderRidersTab();
+    await reloadRef();
+    if (teamId) renderTeamDetail(teamId); else renderRidersTab();
     showToast(currentlyOut ? 'Coureur réactivé' : 'Coureur marqué abandon', 'success');
   } catch (e) { showToast(e.message, 'error'); }
 }
@@ -993,6 +1054,10 @@ function renderStageResultForm() {
     <div class="pred-section"><div class="pred-section-title">🟡 Maillot jaune</div>
       <div class="form-group"><label>Porteur après</label>${riderSelect('yellowJerseyAfter', r.yellowJerseyAfter)}</div>
       <div class="form-group"><label>Jaune change ?</label>${boolSelect('yellowChanged', r.yellowChanged)}</div></div>
+    <div class="pred-section"><div class="pred-section-title">🎽 Maillots après l'étape <span style="font-weight:400;color:var(--muted)">(info, non noté)</span></div>
+      <div class="form-group"><label>🟢 Maillot vert</label>${riderSelect('greenJerseyAfter', r.greenJerseyAfter)}</div>
+      <div class="form-group"><label>🔴 Maillot à pois</label>${riderSelect('polkaJerseyAfter', r.polkaJerseyAfter)}</div>
+      <div class="form-group"><label>⚪ Maillot blanc</label>${riderSelect('whiteJerseyAfter', r.whiteJerseyAfter)}</div></div>
     <div class="pred-section"><div class="pred-section-title">📊 Compléments</div>
       <div class="form-group"><label>Échappée ?</label>${boolSelect('winnerFromBreakaway', r.winnerFromBreakaway)}</div>
       <div class="form-group"><label>Écart 1er/2e</label>${rangeSelect('gapRange', r.gapRange, STAGE_GAP_RANGES)}</div>
@@ -1005,7 +1070,7 @@ function renderStageResultForm() {
 }
 async function saveOrgaStageResult(e, id) {
   e.preventDefault(); const f = e.target, fv = n => { const el = f.querySelector(`[name="${n}"]`); return el ? el.value : ''; };
-  const data = { winner: fv('winner'), top3: [fv('top3_0'), fv('top3_1'), fv('top3_2')], finishType: fv('finishType'), winnerTeam: fv('winnerTeam'), yellowJerseyAfter: fv('yellowJerseyAfter'), yellowChanged: fv('yellowChanged'), winnerFromBreakaway: fv('winnerFromBreakaway'), gapRange: fv('gapRange'), mostCombative: fv('mostCombative'), winnerTime: fv('winnerTime'), lastClimbFirst: fv('lastClimbFirst'), greenChanged: fv('greenChanged') };
+  const data = { winner: fv('winner'), top3: [fv('top3_0'), fv('top3_1'), fv('top3_2')], finishType: fv('finishType'), winnerTeam: fv('winnerTeam'), yellowJerseyAfter: fv('yellowJerseyAfter'), yellowChanged: fv('yellowChanged'), winnerFromBreakaway: fv('winnerFromBreakaway'), gapRange: fv('gapRange'), mostCombative: fv('mostCombative'), winnerTime: fv('winnerTime'), lastClimbFirst: fv('lastClimbFirst'), greenChanged: fv('greenChanged'), greenJerseyAfter: fv('greenJerseyAfter'), polkaJerseyAfter: fv('polkaJerseyAfter'), whiteJerseyAfter: fv('whiteJerseyAfter') };
   try { await rpc('admin_set_stage_result', { p_code: orgaCode, p_stage_id: id, p_data: data }); db.stageResults[id] = data; showToast('Résultat enregistré !', 'success'); } catch (err) { showToast(err.message, 'error'); }
 }
 async function delOrgaStageResult(id) {
@@ -1034,6 +1099,7 @@ async function init() {
     savePreTour, renderStageForm, saveStage, onStageWinnerChange, selectStage,
     renderScoreDetailContent, switchRiderTab,
     orgaAddTeam, orgaDelTeam, orgaAddRider, orgaDelRider, orgaToggleRider,
+    renderTeamDetail, orgaSetLeader,
     orgaStageModal, orgaSaveStage,
     switchResultTab, renderStageResultForm, saveOrgaPreResult, saveOrgaStageResult, delOrgaStageResult,
     orgaApprove, orgaRevoke, orgaReject, orgaResetPass
