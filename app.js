@@ -999,7 +999,7 @@ const PT_ICON = { col: '⛰️', sprint: '🏁', depart: '🚩', arrivee: '🏆'
 function elevationSVG(points) {
   const pts = (points || []).filter(p => p && p.km != null && p.alt != null).sort((a, b) => a.km - b.km);
   if (pts.length < 2) return '';
-  const W = 800, H = 256, padL = 40, padR = 14, padT = 54, padB = 30;
+  const W = 800, H = 274, padL = 40, padR = 14, padT = 54, padB = 46;
   const kmMin = pts[0].km, kmMax = pts[pts.length - 1].km;
   const alts = pts.map(p => p.alt);
   let aMin = Math.min(...alts), aMax = Math.max(...alts);
@@ -1037,20 +1037,38 @@ function elevationSVG(points) {
     labels += `<text x="${tx.toFixed(1)}" y="${labelY.toFixed(1)}" font-size="9.5" fill="#ddd" text-anchor="${anchor}">${esc(lbl)}</text>`;
   });
   const marks = dots + labels;
-  // graduations altitude (min/max) + km début/fin
+  // graduations altitude (min/max)
   const grid = `
     <line x1="${padL}" y1="${y(aMax).toFixed(1)}" x2="${W - padR}" y2="${y(aMax).toFixed(1)}" stroke="#333" stroke-dasharray="3 3"/>
     <line x1="${padL}" y1="${baseY.toFixed(1)}" x2="${W - padR}" y2="${baseY.toFixed(1)}" stroke="#333"/>
     <text x="4" y="${(y(aMax) + 3).toFixed(1)}" font-size="9" fill="#888">${aMax} m</text>
-    <text x="4" y="${(baseY + 3).toFixed(1)}" font-size="9" fill="#888">${aMin} m</text>
-    <text x="${padL}" y="${H - 10}" font-size="9" fill="#888" text-anchor="middle">0</text>
-    <text x="${(W - padR).toFixed(1)}" y="${H - 10}" font-size="9" fill="#888" text-anchor="end">${kmMax} km</text>`;
+    <text x="4" y="${(baseY + 3).toFixed(1)}" font-size="9" fill="#888">${aMin} m</text>`;
+
+  // axe kilométrique sous la ligne de base : balise km de chaque difficulté + guide pointillé
+  let kmAxis = `<rect x="${padL}" y="${baseY.toFixed(1)}" width="${(W - padR - padL).toFixed(1)}" height="${(H - baseY).toFixed(1)}" fill="#0d0d0d"/>`;
+  const kmRowRight = [];
+  pts.forEach(p => {
+    if (!p.type || p.type === 'pt') return;
+    const px = x(p.km), py = y(p.alt);
+    kmAxis += `<line x1="${px.toFixed(1)}" y1="${py.toFixed(1)}" x2="${px.toFixed(1)}" y2="${baseY.toFixed(1)}" stroke="#444" stroke-width="0.7" stroke-dasharray="2 2"/>`;
+    const txt = '' + p.km;
+    const w = txt.length * 5.2;
+    let anchor = 'middle', tx = px;
+    if (px < padL + 12) { anchor = 'start'; tx = padL; }
+    else if (px > W - padR - 12) { anchor = 'end'; tx = W - padR; }
+    const left = anchor === 'middle' ? tx - w / 2 : anchor === 'end' ? tx - w : tx;
+    let lvl = 0; while (kmRowRight[lvl] != null && left < kmRowRight[lvl] + 4) lvl++; if (lvl > 2) lvl = 2;
+    kmRowRight[lvl] = left + w;
+    const ky = baseY + 12 + lvl * 10;
+    kmAxis += `<text x="${tx.toFixed(1)}" y="${ky.toFixed(1)}" font-size="8.5" fill="#e8c84a" text-anchor="${anchor}">${esc(txt)}</text>`;
+  });
 
   return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;background:#141414;border:1px solid var(--border);border-radius:6px;margin-bottom:12px" xmlns="http://www.w3.org/2000/svg">
     <defs><linearGradient id="elevGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFD70055"/><stop offset="1" stop-color="#FFD70008"/></linearGradient></defs>
     ${grid}
     <polygon points="${area}" fill="url(#elevGrad)"/>
     <polyline points="${linePts}" fill="none" stroke="#FFD700" stroke-width="2" stroke-linejoin="round"/>
+    ${kmAxis}
     ${marks}
   </svg>`;
 }
