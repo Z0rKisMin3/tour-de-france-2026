@@ -120,9 +120,17 @@ function riderDisplay(name) {
 
 // selects
 function riderSelect(name, sel, ph = '— Choisir un coureur —', attrs = '') {
-  const rs = [...db.riders].sort(byLastName);
-  return `<select name="${esc(name)}" ${attrs}><option value="">${esc(ph)}</option>${rs.map(r =>
-    `<option value="${esc(r.id)}" ${r.id === sel ? 'selected' : ''}>${esc(riderDisplay(r.name))}${r.nationality ? ' (' + esc(r.nationality) + ')' : ''}</option>`).join('')}</select>`;
+  // Coureurs actifs d'abord (triés par nom), puis abandons en bas
+  const rs = [...db.riders].sort((a, b) => {
+    const ao = a.active === false, bo = b.active === false;
+    if (ao !== bo) return ao ? 1 : -1;
+    return byLastName(a, b);
+  });
+  return `<select name="${esc(name)}" ${attrs}><option value="">${esc(ph)}</option>${rs.map(r => {
+    const out = r.active === false;
+    const nat = r.nationality ? ' (' + esc(r.nationality) + ')' : '';
+    return `<option value="${esc(r.id)}" ${r.id === sel ? 'selected' : ''} ${out ? 'style="color:#E8373A"' : ''}>${out ? '⛔ ' : ''}${esc(riderDisplay(r.name))}${nat}${out ? ' — ABANDON' : ''}</option>`;
+  }).join('')}</select>`;
 }
 function teamSelect(name, sel, ph = '— Choisir une équipe —') {
   const ts = [...db.teams].sort((a, b) => a.name.localeCompare(b.name));
@@ -254,7 +262,7 @@ async function loadAll() {
   ]);
 
   db.teams = teams;
-  db.riders = riders.map(r => ({ id: r.id, name: r.name, nationality: r.nationality, teamId: r.team_id }));
+  db.riders = riders.map(r => ({ id: r.id, name: r.name, nationality: r.nationality, teamId: r.team_id, active: r.active !== false }));
   db.stages = stages.map(s => ({
     id: s.id, number: s.number, date: s.date, startTime: s.start_time, title: s.title,
     type: s.type, coefficient: Number(s.coefficient),
@@ -812,7 +820,8 @@ function renderRidersTab() {
   const rs = [...db.riders].sort(byLastName);
   html += `<div class="card" style="overflow-x:auto"><table><thead><tr><th>Coureur</th><th>Nat.</th><th>Équipe</th>${orgaCode ? '<th></th>' : ''}</tr></thead><tbody>`;
   rs.forEach(r => {
-    html += `<tr><td><strong>${esc(riderDisplay(r.name))}</strong></td><td style="color:var(--muted)">${esc(r.nationality || '—')}</td><td>${esc(getTeamName(r.teamId))}</td>${orgaCode ? `<td class="td-actions"><button class="btn btn-sm btn-danger" onclick="orgaDelRider('${r.id}')">🗑️</button></td>` : ''}</tr>`;
+    const out = r.active === false;
+    html += `<tr style="${out ? 'opacity:.65' : ''}"><td><strong style="${out ? 'color:var(--red)' : ''}">${esc(riderDisplay(r.name))}</strong>${out ? ' <span class="badge badge-red">ABANDON</span>' : ''}</td><td style="color:var(--muted)">${esc(r.nationality || '—')}</td><td>${esc(getTeamName(r.teamId))}</td>${orgaCode ? `<td class="td-actions"><button class="btn btn-sm btn-outline" onclick="orgaToggleRider('${r.id}',${out})">${out ? '✅ Réactiver' : '⛔ HS'}</button> <button class="btn btn-sm btn-danger" onclick="orgaDelRider('${r.id}')">🗑️</button></td>` : ''}</tr>`;
   });
   html += `</tbody></table></div>`;
   sc.innerHTML = html;
@@ -828,9 +837,16 @@ async function orgaAddRider() {
   try { await rpc('admin_upsert_rider', { p_code: orgaCode, p_id: '', p_name: name, p_nat: nat, p_team_id: team }); await reloadRef(); renderRidersTab(); showToast('Coureur ajouté', 'success'); } catch (e) { showToast(e.message, 'error'); }
 }
 async function orgaDelRider(id) { if (!confirm('Supprimer ce coureur ?')) return; try { await rpc('admin_delete_rider', { p_code: orgaCode, p_id: id }); await reloadRef(); renderRidersTab(); showToast('Supprimé', 'success'); } catch (e) { showToast(e.message, 'error'); } }
+async function orgaToggleRider(id, currentlyOut) {
+  try {
+    await rpc('admin_set_rider_active', { p_code: orgaCode, p_rider_id: id, p_active: currentlyOut });
+    await reloadRef(); renderRidersTab();
+    showToast(currentlyOut ? 'Coureur réactivé' : 'Coureur marqué abandon', 'success');
+  } catch (e) { showToast(e.message, 'error'); }
+}
 async function reloadRef() {
   const [teams, riders] = await Promise.all([sbSelect('teams'), sbSelect('riders')]);
-  db.teams = teams; db.riders = riders.map(r => ({ id: r.id, name: r.name, nationality: r.nationality, teamId: r.team_id }));
+  db.teams = teams; db.riders = riders.map(r => ({ id: r.id, name: r.name, nationality: r.nationality, teamId: r.team_id, active: r.active !== false }));
 }
 
 // ================================================================
@@ -1017,7 +1033,7 @@ async function init() {
     showTab, openAuth, doRegister, doLogin, logout, toggleOrga, closeModal,
     savePreTour, renderStageForm, saveStage, onStageWinnerChange, selectStage,
     renderScoreDetailContent, switchRiderTab,
-    orgaAddTeam, orgaDelTeam, orgaAddRider, orgaDelRider,
+    orgaAddTeam, orgaDelTeam, orgaAddRider, orgaDelRider, orgaToggleRider,
     orgaStageModal, orgaSaveStage,
     switchResultTab, renderStageResultForm, saveOrgaPreResult, saveOrgaStageResult, delOrgaStageResult,
     orgaApprove, orgaRevoke, orgaReject, orgaResetPass
