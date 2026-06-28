@@ -296,7 +296,8 @@ async function loadAll() {
     type: s.type, coefficient: Number(s.coefficient),
     enableLastClimbPrediction: s.enable_last_climb,
     enableGreenJerseyChangePrediction: s.enable_green_jersey,
-    lockUntil: s.lock_until
+    lockUntil: s.lock_until,
+    distanceKm: s.distance_km, elevationM: s.elevation_m, details: s.details, profileUrl: s.profile_url
   }));
   db.players = players;
   db.pretourResults = ptres.length ? ptres[0].data : null;
@@ -983,10 +984,60 @@ async function reloadRef() {
 // ================================================================
 function renderStages(el) {
   let html = `<div class="section-header"><div class="section-title">📅 Étapes</div>${orgaCode ? `<button class="btn btn-primary" onclick="orgaStageModal()">+ Ajouter</button>` : ''}</div>`;
+  html += `<div class="alert alert-info" style="margin-bottom:10px">Clique sur une étape pour voir sa fiche (distance, dénivelé, cols & sprints, profil officiel).</div>`;
   db.stages.forEach(s => {
     const ti = STAGE_TYPES[s.type] || STAGE_TYPES.plaine; const locked = isStageLocked(s);
-    html += `<div class="stage-card"><div class="stage-num" style="background:${locked ? '#2a1515' : 'var(--surface)'}">É${s.number}</div><div class="stage-info"><div class="stage-title">${esc(s.title)}</div><div class="stage-meta">${formatDate(s.date)} · ${shortTime(s.startTime)} · <span class="${ti.color}">${ti.label}</span> · <span class="coeff-badge">×${ti.coefficient.toFixed(2)}</span>${s.enableLastClimbPrediction ? ' · ⛰️' : ''}${s.enableGreenJerseyChangePrediction ? ' · 🟢' : ''}</div></div><div class="stage-actions"><span class="badge ${locked ? 'badge-locked' : 'badge-open'}">${locked ? '🔒' : '🟢'}</span>${orgaCode ? `<button class="btn btn-sm btn-outline" onclick="orgaStageModal('${s.id}')">✏️</button>` : ''}</div></div>`;
+    html += `<div class="stage-card" style="cursor:pointer" onclick="renderStageDetail('${s.id}')"><div class="stage-num" style="background:${locked ? '#2a1515' : 'var(--surface)'}">É${s.number}</div><div class="stage-info"><div class="stage-title">${esc(s.title)} ›</div><div class="stage-meta">${formatDate(s.date)} · ${shortTime(s.startTime)} · <span class="${ti.color}">${ti.label}</span>${s.distanceKm ? ' · ' + s.distanceKm + ' km' : ''} · <span class="coeff-badge">×${ti.coefficient.toFixed(2)}</span>${s.enableLastClimbPrediction ? ' · ⛰️' : ''}${s.enableGreenJerseyChangePrediction ? ' · 🟢' : ''}</div></div><div class="stage-actions" onclick="event.stopPropagation()"><span class="badge ${locked ? 'badge-locked' : 'badge-open'}">${locked ? '🔒' : '🟢'}</span>${orgaCode ? `<button class="btn btn-sm btn-outline" onclick="orgaStageModal('${s.id}')">✏️</button>` : ''}</div></div>`;
   });
+  el.innerHTML = html;
+}
+
+const PT_ICON = { col: '⛰️', sprint: '🏁', depart: '🚩', arrivee: '🏆', cote: '↗️', ravito: '🥤' };
+function renderStageDetail(stageId) {
+  const el = document.getElementById('mainContent');
+  const s = db.stages.find(x => x.id === stageId);
+  if (!s) { showTab('stages'); return; }
+  const ti = STAGE_TYPES[s.type] || STAGE_TYPES.plaine;
+  const locked = isStageLocked(s);
+  const res = db.stageResults[s.id];
+
+  let html = `<button class="btn btn-sm btn-outline" onclick="showTab('stages')">← Toutes les étapes</button>`;
+  html += `<div class="card" style="margin-top:12px"><div class="card-title">Étape ${s.number} · ${esc(s.title)}</div>`;
+  html += `<div class="stats-row" style="margin-bottom:8px">
+    <div class="stat-box"><div class="stat-label">Type</div><div class="stat-value ${ti.color}" style="font-size:16px">${ti.label}</div></div>
+    <div class="stat-box"><div class="stat-label">Distance</div><div class="stat-value" style="font-size:16px">${s.distanceKm ? s.distanceKm + ' km' : '—'}</div></div>
+    <div class="stat-box"><div class="stat-label">Dénivelé</div><div class="stat-value" style="font-size:16px">${s.elevationM ? s.elevationM + ' m' : '—'}</div></div>
+    <div class="stat-box"><div class="stat-label">Coefficient</div><div class="stat-value" style="font-size:16px">×${ti.coefficient.toFixed(2)}</div></div>
+  </div>`;
+  html += `<div style="color:var(--muted);font-size:13px">📅 ${formatDate(s.date)} · départ ${shortTime(s.startTime)} · ${locked ? '🔒 verrouillée' : '🟢 ouverte aux pronos'}${s.enableLastClimbPrediction ? ' · ⛰️ prono sommet actif' : ''}${s.enableGreenJerseyChangePrediction ? ' · 🟢 prono maillot vert actif' : ''}</div>`;
+  html += `</div>`;
+
+  // Points clés (cols, sprints…)
+  html += `<div class="card"><div class="card-title">🗺️ Parcours & passages clés</div>`;
+  const pts = Array.isArray(s.details) ? [...s.details].sort((a, b) => (a.km || 0) - (b.km || 0)) : [];
+  if (!pts.length) {
+    html += `<div style="color:var(--muted);font-size:13px">Détail du parcours pas encore renseigné pour cette étape.</div>`;
+  } else {
+    html += `<table><tbody>`;
+    pts.forEach(p => {
+      const icon = PT_ICON[p.type] || '•';
+      const label = p.type === 'col' ? `Col ${p.cat ? '(cat. ' + esc(p.cat) + ')' : ''}` : p.type === 'sprint' ? 'Sprint intermédiaire' : p.type === 'arrivee' ? 'Arrivée' : p.type === 'depart' ? 'Départ' : (p.type || '');
+      html += `<tr><td style="width:60px;color:var(--muted)">${p.km != null ? 'km ' + p.km : ''}</td><td>${icon} <strong>${esc(p.name || '')}</strong>${p.alt ? ` <span style="color:var(--muted);font-size:11px">${esc(p.alt)} m</span>` : ''}</td><td style="color:var(--muted);font-size:12px;text-align:right">${label}</td></tr>`;
+    });
+    html += `</tbody></table>`;
+  }
+  html += `<div style="margin-top:12px"><a href="${esc(s.profileUrl || 'https://www.letour.fr/fr/le-parcours')}" target="_blank" rel="noopener" class="btn btn-sm btn-outline">📈 Voir le profil officiel sur letour.fr ↗</a></div>`;
+  html += `</div>`;
+
+  // Résultat si dispo
+  if (res) {
+    html += `<div class="card"><div class="card-title">✅ Résultat</div>
+      <div class="score-row"><div class="score-field">Vainqueur</div><div><strong>${esc(getRiderName(res.winner))}</strong></div></div>
+      ${res.top3 ? `<div class="score-row"><div class="score-field">Top 3</div><div>${(res.top3 || []).map(getRiderName).join(', ')}</div></div>` : ''}
+      ${res.yellowJerseyAfter ? `<div class="score-row"><div class="score-field">Maillot jaune</div><div>🟡 ${esc(getRiderName(res.yellowJerseyAfter))}</div></div>` : ''}
+    </div>`;
+  }
+
   el.innerHTML = html;
 }
 function orgaStageModal(id) {
@@ -1168,7 +1219,7 @@ async function init() {
     savePreTour, renderStageForm, saveStage, onStageWinnerChange, onPreTourWinnerChange, selectStage,
     renderScoreDetailContent, switchRiderTab,
     orgaAddTeam, orgaDelTeam, orgaAddRider, orgaDelRider, orgaToggleRider,
-    renderTeamDetail, orgaSetLeader,
+    renderTeamDetail, orgaSetLeader, renderStageDetail,
     orgaStageModal, orgaSaveStage,
     switchResultTab, renderStageResultForm, saveOrgaPreResult, saveOrgaStageResult, delOrgaStageResult,
     orgaApprove, orgaRevoke, orgaReject, orgaResetPass
