@@ -33,6 +33,7 @@ const FINISH_TYPES = ['Sprint', 'Échappée', 'Montagne', 'Contre-la-montre'];
 // ÉTAT
 // ================================================================
 let db = {
+  season: null,             // métadonnées de la saison active (nom, dates, nb attendus…)
   teams: [], riders: [], stages: [], players: [],
   pretourResults: null, stageResults: {},
   pretourPredictions: {},   // { playerId: data }  (public = verrouillés seulement)
@@ -275,7 +276,8 @@ function validateUniqueSelection(values) {
 // CHARGEMENT DES DONNÉES
 // ================================================================
 async function loadAll() {
-  const [teams, riders, stages, players, ptres, stres, ptpreds, stpreds] = await Promise.all([
+  const [seasons, teams, riders, stages, players, ptres, stres, ptpreds, stpreds] = await Promise.all([
+    sbSelect('seasons', 'select=*&is_active=eq.true'),
     sbSelect('teams'),
     sbSelect('riders'),
     sbSelect('stages', 'select=*&order=number.asc'),
@@ -286,6 +288,7 @@ async function loadAll() {
     sbSelect('stage_predictions')      // RLS: renvoie seulement étapes verrouillées
   ]);
 
+  db.season = seasons.length ? seasons[0] : null;
   db.teams = teams;
   db.riders = riders.map(r => ({ id: r.id, name: r.name, nationality: r.nationality, teamId: r.team_id, active: r.active !== false }));
   db.stages = stages.map(s => ({
@@ -477,12 +480,17 @@ function renderDashboard(el) {
   let html = pendingBanner();
   if (!session) html += `<div class="alert alert-info">👋 Bienvenue ! <a href="#" onclick="openAuth('register');return false" style="color:var(--yellow)">Crée un compte</a> ou <a href="#" onclick="openAuth('login');return false" style="color:var(--yellow)">connecte-toi</a> pour pronostiquer. Tu peux consulter le classement et le parcours librement.</div>`;
 
+  const sz = db.season || {};
+  const exp = (cur, target) => target ? `${cur}<span style="font-size:13px;color:var(--muted)"> / ${target}</span>` : `${cur}`;
   html += `<div class="stats-row">
     <div class="stat-box"><div class="stat-label">Joueurs</div><div class="stat-value">${db.players.length}</div></div>
-    <div class="stat-box"><div class="stat-label">Étapes</div><div class="stat-value">${db.stages.length}</div></div>
-    <div class="stat-box"><div class="stat-label">Étapes courues</div><div class="stat-value">${done.length}</div></div>
-    <div class="stat-box"><div class="stat-label">Coureurs</div><div class="stat-value">${db.riders.length}</div></div>
+    <div class="stat-box"><div class="stat-label">Étapes</div><div class="stat-value">${exp(db.stages.length, sz.nb_stages)}</div></div>
+    <div class="stat-box"><div class="stat-label">Équipes</div><div class="stat-value">${exp(db.teams.length, sz.nb_teams)}</div></div>
+    <div class="stat-box"><div class="stat-label">Coureurs</div><div class="stat-value">${exp(db.riders.length, sz.nb_riders)}</div></div>
   </div>`;
+  if (sz.nb_riders && db.riders.length < sz.nb_riders) {
+    html += `<div class="alert alert-info">ℹ️ Effectif provisoire : <strong>${db.riders.length}/${sz.nb_riders}</strong> coureurs. Les startlists officielles (8 par équipe) sont confirmées juste avant le Grand Départ — l'effectif sera complété automatiquement le 2 juillet.</div>`;
+  }
 
   html += `<div class="alert ${ptLocked ? 'alert-danger' : 'alert-success'}">${ptLocked ? '🔒 Pronostics avant départ <strong>verrouillés</strong> — le Tour a commencé' : '🟢 Pronostics avant départ <strong>ouverts</strong> jusqu\'au départ de l\'étape 1'}</div>`;
 
