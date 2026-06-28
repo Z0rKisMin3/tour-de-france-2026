@@ -1008,14 +1008,30 @@ function renderRidersTab() {
   const teams = [...db.teams].sort((a, b) => a.name.localeCompare(b.name));
   let html = '';
   if (orgaCode) html += `<div class="inline-form"><div class="inline-form-title">Ajouter un coureur</div><div class="grid-2" style="gap:8px;margin-bottom:8px"><div class="form-group"><label>Nom</label><input type="text" id="nrName" maxlength="60"></div><div class="form-group"><label>Nationalité</label><input type="text" id="nrNat" maxlength="10"></div><div class="form-group"><label>Équipe</label><select id="nrTeam"><option value="">— Sans équipe —</option>${teams.map(t => `<option value="${esc(t.id)}">${esc(t.name)}</option>`).join('')}</select></div></div><button class="btn btn-primary" onclick="orgaAddRider()">Ajouter</button></div>`;
+  html += `<div style="margin-bottom:10px"><input type="search" id="riderSearch" placeholder="🔍 Rechercher par nom, nationalité ou équipe…" oninput="filterRiders()" style="width:100%;padding:8px 12px;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:14px"></div>`;
   const rs = [...db.riders].sort(byLastName);
-  html += `<div class="card" style="overflow-x:auto"><table><thead><tr><th>Coureur</th><th>Nat.</th><th>Équipe</th>${orgaCode ? '<th></th>' : ''}</tr></thead><tbody>`;
+  html += `<div class="card" style="overflow-x:auto"><table><thead><tr><th>Coureur</th><th>Nat.</th><th>Équipe</th>${orgaCode ? '<th></th>' : ''}</tr></thead><tbody id="ridersTableBody">`;
   rs.forEach(r => {
     const out = r.active === false;
-    html += `<tr style="${out ? 'opacity:.65' : ''}"><td><strong style="${out ? 'color:var(--red)' : ''}">${esc(riderDisplay(r.name))}</strong>${out ? ' <span class="badge badge-red">ABANDON</span>' : ''}</td><td style="color:var(--muted)">${esc(r.nationality || '—')}</td><td>${esc(getTeamName(r.teamId))}</td>${orgaCode ? `<td class="td-actions"><button class="btn btn-sm btn-outline" onclick="orgaToggleRider('${r.id}',${out})">${out ? '✅ Réactiver' : '⛔ HS'}</button> <button class="btn btn-sm btn-danger" onclick="orgaDelRider('${r.id}')">🗑️</button></td>` : ''}</tr>`;
+    const teamName = getTeamName(r.teamId);
+    const searchKey = (riderDisplay(r.name) + ' ' + (r.nationality || '') + ' ' + teamName).toLowerCase();
+    html += `<tr data-search="${esc(searchKey)}" style="${out ? 'opacity:.65' : ''}"><td><strong style="${out ? 'color:var(--red)' : ''}">${esc(riderDisplay(r.name))}</strong>${out ? ' <span class="badge badge-red">ABANDON</span>' : ''}</td><td style="color:var(--muted)">${esc(r.nationality || '—')}</td><td>${esc(teamName)}</td>${orgaCode ? `<td class="td-actions"><button class="btn btn-sm btn-outline" onclick="orgaToggleRider('${r.id}',${out})">${out ? '✅ Réactiver' : '⛔ HS'}</button> <button class="btn btn-sm btn-danger" onclick="orgaDelRider('${r.id}')">🗑️</button></td>` : ''}</tr>`;
   });
-  html += `</tbody></table></div>`;
+  html += `</tbody></table></div><div id="riderSearchCount" style="font-size:12px;color:var(--muted);margin-top:6px;text-align:right">${rs.length} coureurs</div>`;
   sc.innerHTML = html;
+}
+
+function filterRiders() {
+  const q = (document.getElementById('riderSearch')?.value || '').toLowerCase().trim();
+  const rows = document.querySelectorAll('#ridersTableBody tr');
+  let visible = 0;
+  rows.forEach(tr => {
+    const match = !q || (tr.dataset.search || '').includes(q);
+    tr.style.display = match ? '' : 'none';
+    if (match) visible++;
+  });
+  const count = document.getElementById('riderSearchCount');
+  if (count) count.textContent = q ? `${visible} résultat${visible !== 1 ? 's' : ''} sur ${rows.length}` : `${rows.length} coureurs`;
 }
 async function orgaAddTeam() {
   const name = document.getElementById('ntName').value.trim(); if (!name) return;
@@ -1359,7 +1375,7 @@ async function init() {
     showTab, openAuth, doRegister, doLogin, logout, toggleOrga, closeModal, openBugReport, submitBugReport,
     renderPronos, showPronosSub, goPronos, resetPreTour, resetStage,
     savePreTour, renderStageForm, saveStage, onStageWinnerChange, onPreTourWinnerChange, selectStage,
-    renderScoreDetailContent, switchRiderTab,
+    renderScoreDetailContent, switchRiderTab, filterRiders,
     orgaAddTeam, orgaDelTeam, orgaAddRider, orgaDelRider, orgaToggleRider,
     renderTeamDetail, orgaSetLeader, renderStageDetail,
     orgaStageModal, orgaSaveStage,
