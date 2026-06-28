@@ -523,7 +523,7 @@ function renderDashboard(el) {
   if (!upcoming.length) html += `<div class="empty-state"><p>Aucune étape à venir</p></div>`;
   else upcoming.slice(0, 5).forEach(s => {
     const ti = STAGE_TYPES[s.type] || STAGE_TYPES.plaine;
-    html += `<div class="stage-card"><div class="stage-num">É${s.number}</div><div class="stage-info"><div class="stage-title">${esc(s.title)}</div><div class="stage-meta">${formatDate(s.date)} · ${shortTime(s.startTime)} · <span class="${ti.color}">${ti.label}</span></div></div><span class="badge badge-open">Ouvert</span></div>`;
+    html += `<div class="stage-card" style="cursor:pointer" onclick="renderStageDetail('${s.id}')"><div class="stage-num">É${s.number}</div><div class="stage-info"><div class="stage-title">${esc(s.title)} ›</div><div class="stage-meta">${formatDate(s.date)} · ${shortTime(s.startTime)} · <span class="${ti.color}">${ti.label}</span></div></div><span class="badge badge-open">Ouvert</span></div>`;
   });
   html += `</div>`;
 
@@ -531,7 +531,7 @@ function renderDashboard(el) {
   if (!done.length) html += `<div class="empty-state"><p>Aucun résultat encodé</p></div>`;
   else done.slice(0, 4).forEach(s => {
     const r = db.stageResults[s.id];
-    html += `<div class="stage-card"><div class="stage-num">É${s.number}</div><div class="stage-info"><div class="stage-title">${esc(s.title)}</div><div class="stage-meta">Vainqueur : <strong>${esc(getRiderName(r.winner))}</strong></div></div><span class="badge badge-locked">Terminée</span></div>`;
+    html += `<div class="stage-card" style="cursor:pointer" onclick="renderStageDetail('${s.id}')"><div class="stage-num">É${s.number}</div><div class="stage-info"><div class="stage-title">${esc(s.title)} ›</div><div class="stage-meta">Vainqueur : <strong>${esc(getRiderName(r.winner))}</strong></div></div><span class="badge badge-locked">Terminée</span></div>`;
   });
   html += `</div>`;
 
