@@ -17,17 +17,29 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  background: var(--bg);
+  background: var(--bg) url('bg.png') no-repeat center center fixed;
+  background-size: cover;
   color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-size: 14px;
   line-height: 1.5;
   min-height: 100vh;
 }
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 8, 12, 0.72);
+  z-index: 0;
+  pointer-events: none;
+}
+header, #mainNav, #mainContent, #appFooter { position: relative; z-index: 1; }
 
 /* HEADER */
 header {
-  background: #111;
+  background: rgba(10, 10, 14, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border-bottom: 2px solid var(--yellow);
   padding: 12px 16px;
   position: sticky;
@@ -61,7 +73,9 @@ h1 {
 
 /* NAV */
 #mainNav {
-  background: var(--surface);
+  background: rgba(20, 20, 24, 0.82);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border);
   position: sticky;
   top: 65px;
@@ -107,8 +121,10 @@ body.admin-mode .admin-only { display: inline-flex; }
 
 /* CARDS */
 .card {
-  background: var(--card);
-  border: 1px solid var(--border);
+  background: rgba(28, 28, 32, 0.82);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(60, 60, 70, 0.7);
   border-radius: var(--radius);
   padding: 16px;
   margin-bottom: 16px;
