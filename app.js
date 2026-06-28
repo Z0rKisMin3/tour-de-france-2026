@@ -9,6 +9,7 @@ const HEADERS = { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY };
 
 const LS_SESSION = 'tdf2026_session';
 const LS_ORGA = 'tdf2026_orga';
+const LEGAL_VERSION = '1.0-2026-06-28';
 
 // ================================================================
 // CONSTANTES MÉTIER
@@ -346,6 +347,10 @@ function openAuth(mode) {
     <div class="form-group"><label>Pseudo</label><input type="text" id="authName" maxlength="40" autocomplete="username"></div>
     ${isReg ? `<div class="form-group"><label>Email (facultatif, pour récupération)</label><input type="email" id="authEmail" maxlength="120"></div>` : ''}
     <div class="form-group"><label>Mot de passe</label><input type="password" id="authPass" maxlength="80" autocomplete="${isReg ? 'new-password' : 'current-password'}"></div>
+    ${isReg ? `<label style="display:flex;gap:8px;align-items:flex-start;margin:10px 0;font-size:13px;cursor:pointer">
+      <input type="checkbox" id="authLegal" style="margin-top:3px">
+      <span>J'ai lu et j'accepte le <a href="legal/reglement.html" target="_blank" rel="noopener" style="color:var(--yellow)">règlement</a> de l'application « Pronostics Tour 2026 » (et les <a href="legal/index.html" target="_blank" rel="noopener" style="color:var(--yellow)">documents associés</a>).</span>
+    </label>` : ''}
     ${isReg ? `<div class="alert alert-info" style="margin:6px 0 12px">ℹ️ Ton inscription devra être validée par l'organisateur avant de pouvoir pronostiquer.</div>` : ''}
     <div style="display:flex;gap:8px;margin-top:6px">
       <button class="btn btn-primary" onclick="${isReg ? 'doRegister()' : 'doLogin()'}">${isReg ? 'Créer mon compte' : 'Connexion'}</button>
@@ -364,8 +369,10 @@ async function doRegister() {
   const pass = document.getElementById('authPass').value;
   if (name.length < 2) return showToast('Pseudo trop court', 'error');
   if (pass.length < 4) return showToast('Mot de passe trop court (min 4)', 'error');
+  const legal = document.getElementById('authLegal');
+  if (!legal || !legal.checked) return showToast('Tu dois accepter le règlement pour t\'inscrire', 'error');
   try {
-    const res = await rpc('register_player', { p_name: name, p_email: email, p_password: pass });
+    const res = await rpc('register_player', { p_name: name, p_email: email, p_password: pass, p_legal_version: LEGAL_VERSION });
     session = { token: res.token, id: res.id, name: res.name, approved: res.approved };
     saveSession(); closeModal();
     showToast('Compte créé ! En attente de validation.', 'success');
