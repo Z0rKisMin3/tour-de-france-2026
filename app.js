@@ -426,8 +426,7 @@ function renderShell() {
   // Nav
   const tabs = [
     ['dashboard', '🏠 Accueil'],
-    ['pretour', '🏁 Avant départ'],
-    ['stagepronostics', '📝 Par étape'],
+    ['pronos', '📝 Pronostics'],
     ['ranking', '🏆 Classement'],
     ['scores', '📊 Détail'],
     ['riders', '🚴 Coureurs'],
@@ -451,7 +450,7 @@ function showTab(tab) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   const main = document.getElementById('mainContent');
   const r = {
-    dashboard: renderDashboard, pretour: renderPreTour, stagepronostics: renderStagePronostics,
+    dashboard: renderDashboard, pronos: renderPronos,
     ranking: renderRanking, scores: renderScoreDetail, riders: renderRiders, stages: renderStages,
     rules: renderRules, registrations: renderRegistrations, results: renderResults
   }[tab];
@@ -525,8 +524,8 @@ function renderDashboard(el) {
   html += `</div>`;
 
   html += `<div class="card"><div class="card-title">⚡ Accès rapide</div><div style="display:flex;flex-direction:column;gap:8px">
-    <button class="btn btn-outline" onclick="showTab('pretour')">🏁 Mon prono avant départ</button>
-    <button class="btn btn-outline" onclick="showTab('stagepronostics')">📝 Mes pronos d'étape</button>
+    <button class="btn btn-outline" onclick="goPronos('pretour')">🏁 Mon prono avant départ</button>
+    <button class="btn btn-outline" onclick="goPronos('stage')">📝 Mes pronos d'étape</button>
     <button class="btn btn-outline" onclick="showTab('rules')">📜 Règlement</button>
   </div></div>`;
 
@@ -535,7 +534,29 @@ function renderDashboard(el) {
 }
 
 // ================================================================
-// ONGLET : AVANT DÉPART (mon prono)
+// ONGLET : PRONOSTICS (regroupe Avant départ + Par étape)
+// ================================================================
+let pronosSub = 'pretour';
+function renderPronos(el) {
+  el.innerHTML = `<div class="sub-tabs">
+    <button class="sub-tab-btn ${pronosSub === 'pretour' ? 'active' : ''}" id="psPre" onclick="showPronosSub('pretour')">🏁 Avant départ</button>
+    <button class="sub-tab-btn ${pronosSub === 'stage' ? 'active' : ''}" id="psStage" onclick="showPronosSub('stage')">📅 Par étape</button>
+  </div><div id="pronosSub"></div>`;
+  showPronosSub(pronosSub);
+}
+function showPronosSub(which) {
+  pronosSub = which;
+  const a = document.getElementById('psPre'), b = document.getElementById('psStage');
+  if (a) a.classList.toggle('active', which === 'pretour');
+  if (b) b.classList.toggle('active', which === 'stage');
+  const sub = document.getElementById('pronosSub');
+  if (!sub) return;
+  if (which === 'pretour') renderPreTour(sub); else renderStagePronostics(sub);
+}
+function goPronos(which) { showTab('pronos'); showPronosSub(which); }
+
+// ================================================================
+// SOUS-ONGLET : AVANT DÉPART (mon prono)
 // ================================================================
 function renderPreTour(el) {
   if (!session) { el.innerHTML = `<div class="alert alert-info">Connecte-toi pour encoder tes pronostics. <button class="btn btn-sm btn-primary" onclick="openAuth('login')">Se connecter</button></div>`; return; }
@@ -543,7 +564,9 @@ function renderPreTour(el) {
 
   const locked = isPreTourLocked();
   const pred = myPretour || {};
-  let html = `<div class="section-header"><div class="section-title">🏁 Mes pronostics avant le départ</div></div>`;
+  let html = `<div class="section-header"><div class="section-title">🏁 Mes pronostics avant le départ</div>
+    <button class="btn btn-sm btn-danger" onclick="resetPreTour()" ${locked ? 'disabled' : ''} title="${locked ? 'Verrouillé : le Tour a commencé' : 'Effacer tous mes pronostics avant départ'}">🗑️ Réinitialiser</button>
+  </div>`;
   if (locked) html += `<div class="alert alert-danger">🔒 Verrouillés — le Tour a commencé. Tu ne peux plus modifier.</div>`;
   else html += `<div class="alert alert-info">Tu peux modifier tes choix jusqu'au départ de l'étape 1 (${formatDate(db.stages[0] && db.stages[0].date)} ${shortTime(db.stages[0] && db.stages[0].startTime)}).</div>`;
 
@@ -601,6 +624,18 @@ async function savePreTour(e) {
     myPretour = data; db.pretourPredictions[session.id] = data;
     showToast('Pronostics enregistrés !', 'success');
   } catch (err) { showToast(err.message, 'error'); }
+}
+
+async function resetPreTour() {
+  if (isPreTourLocked()) return showToast('Pronostics verrouillés', 'error');
+  if (!myPretour) return showToast('Aucun pronostic à réinitialiser', '');
+  if (!confirm('Réinitialiser TOUS tes pronostics avant départ ? Cette action est irréversible.')) return;
+  try {
+    await rpc('reset_pretour_prediction', { p_token: session.token });
+    myPretour = null; delete db.pretourPredictions[session.id];
+    showPronosSub('pretour');
+    showToast('Pronostics avant départ réinitialisés', 'success');
+  } catch (e) { showToast(e.message, 'error'); }
 }
 
 // ================================================================
@@ -677,10 +712,26 @@ function renderStageForm() {
   if (stage.enableGreenJerseyChangePrediction)
     html += `<div class="pred-section"><div class="pred-section-title">🟢 Maillot vert</div><div class="form-group"><label>Le maillot vert change-t-il ? <span class="pts-label">5 pts</span></label>${boolSelect('greenChanged', pred.greenChanged)}</div></div>`;
 
+  html += `<div style="display:flex;gap:8px;margin-top:8px">`;
   if (!locked) html += `<button type="submit" class="btn btn-primary">💾 Enregistrer</button>`;
+  html += `<button type="button" class="btn btn-danger" onclick="resetStage('${stageId}')" ${locked ? 'disabled' : ''} title="${locked ? 'Verrouillé : étape commencée' : 'Effacer mon prono pour cette étape'}">🗑️ Réinitialiser ce prono</button></div>`;
   html += `</form>`;
   area.innerHTML = html;
-  if (locked) area.querySelectorAll('select,input').forEach(x => x.disabled = true);
+  if (locked) area.querySelectorAll('select,input,textarea').forEach(x => x.disabled = true);
+}
+
+async function resetStage(stageId) {
+  const stage = db.stages.find(s => s.id === stageId);
+  if (!stage || isStageLocked(stage)) return showToast('Étape verrouillée', 'error');
+  if (!myStages[stageId]) return showToast('Aucun pronostic à réinitialiser', '');
+  if (!confirm('Réinitialiser ton pronostic pour cette étape ?')) return;
+  try {
+    await rpc('reset_stage_prediction', { p_token: session.token, p_stage_id: stageId });
+    delete myStages[stageId]; delete db.stagePredictions[session.id + '_' + stageId];
+    renderStageForm();
+    const st = document.getElementById('spStatus'); if (st) st.innerHTML = spStatusHTML();
+    showToast('Pronostic réinitialisé', 'success');
+  } catch (e) { showToast(e.message, 'error'); }
 }
 
 async function saveStage(e, stageId) {
@@ -1113,6 +1164,7 @@ async function init() {
   // Expose pour onclick inline
   Object.assign(window, {
     showTab, openAuth, doRegister, doLogin, logout, toggleOrga, closeModal,
+    renderPronos, showPronosSub, goPronos, resetPreTour, resetStage,
     savePreTour, renderStageForm, saveStage, onStageWinnerChange, onPreTourWinnerChange, selectStage,
     renderScoreDetailContent, switchRiderTab,
     orgaAddTeam, orgaDelTeam, orgaAddRider, orgaDelRider, orgaToggleRider,
