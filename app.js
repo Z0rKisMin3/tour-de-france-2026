@@ -162,12 +162,14 @@ function boolSelect(name, sel) {
     <option value="oui" ${sel === 'oui' ? 'selected' : ''}>Oui</option>
     <option value="non" ${sel === 'non' ? 'selected' : ''}>Non</option></select>`;
 }
-// Vainqueur final du Tour → renseigne automatiquement le 1er du podium
+// Vainqueur final du Tour → renseigne automatiquement le 1er du podium ET le 1er du Top 10
 function onPreTourWinnerChange(sel) {
   const form = sel.closest('form');
   if (!form) return;
   const p0 = form.querySelector('[name="pod0"]');
   if (p0) p0.value = sel.value;
+  const t0 = form.querySelector('[name="top10_0"]');
+  if (t0) t0.value = sel.value;
 }
 // Vainqueur d'étape → renseigne automatiquement le 1er du Top 3 et l'équipe du vainqueur
 function onStageWinnerChange(sel) {
@@ -545,7 +547,7 @@ function renderPreTour(el) {
     <div class="form-group"><label>Podium — 3e</label>${riderSelect('pod2', pred.podium && pred.podium[2])}</div></div>`;
 
   html += `<div class="pred-section"><div class="pred-section-title">🔟 Top 10 final <span class="pts-label" style="color:var(--muted)">10 pts/coureur · max 100</span></div>`;
-  for (let i = 0; i < 10; i++) html += `<div class="form-group"><label>Top 10 — n°${i + 1}</label>${riderSelect('top10_' + i, pred.top10 && pred.top10[i])}</div>`;
+  for (let i = 0; i < 10; i++) html += `<div class="form-group"><label>Top 10 — n°${i + 1}${i === 0 ? ' <span class="pts-label">rempli auto par le vainqueur</span>' : ''}</label>${riderSelect('top10_' + i, pred.top10 && pred.top10[i])}</div>`;
   html += `</div>`;
 
   html += `<div class="pred-section"><div class="pred-section-title">🎽 Maillots</div>
