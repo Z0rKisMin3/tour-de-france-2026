@@ -347,6 +347,7 @@ function openAuth(mode) {
     <div class="form-group"><label>Pseudo</label><input type="text" id="authName" maxlength="40" autocomplete="username"></div>
     ${isReg ? `<div class="form-group"><label>Email (facultatif, pour récupération)</label><input type="email" id="authEmail" maxlength="120"></div>` : ''}
     <div class="form-group"><label>Mot de passe</label><input type="password" id="authPass" maxlength="80" autocomplete="${isReg ? 'new-password' : 'current-password'}"></div>
+    ${isReg ? `<div class="form-group"><label>Présentation (facultatif)</label><textarea id="authNote" rows="2" maxlength="300" placeholder="Es-tu parent / ami / connaissance de quelqu'un ? Précise-le pour faciliter la validation de ton inscription."></textarea></div>` : ''}
     ${isReg ? `<label style="display:flex;gap:8px;align-items:flex-start;margin:10px 0;font-size:13px;cursor:pointer">
       <input type="checkbox" id="authLegal" style="margin-top:3px">
       <span>J'ai lu et j'accepte le <a href="legal/reglement.html" target="_blank" rel="noopener" style="color:var(--yellow)">règlement</a> de l'application « Pronostics Tour 2026 » (et les <a href="legal/index.html" target="_blank" rel="noopener" style="color:var(--yellow)">documents associés</a>).</span>
@@ -372,7 +373,9 @@ async function doRegister() {
   const legal = document.getElementById('authLegal');
   if (!legal || !legal.checked) return showToast('Tu dois accepter le règlement pour t\'inscrire', 'error');
   try {
-    const res = await rpc('register_player', { p_name: name, p_email: email, p_password: pass, p_legal_version: LEGAL_VERSION });
+    const noteEl = document.getElementById('authNote');
+    const note = noteEl ? noteEl.value.trim() : '';
+    const res = await rpc('register_player', { p_name: name, p_email: email, p_password: pass, p_legal_version: LEGAL_VERSION, p_note: note });
     session = { token: res.token, id: res.id, name: res.name, approved: res.approved };
     saveSession(); closeModal();
     showToast('Compte créé ! En attente de validation.', 'success');
@@ -1179,7 +1182,7 @@ async function renderRegistrations(el) {
     let html = '';
     html += `<div class="card"><div class="card-title">⏳ En attente (${pending.length})</div>`;
     if (!pending.length) html += `<div style="color:var(--muted)">Aucune demande en attente</div>`;
-    else { html += `<table><tbody>`; pending.forEach(r => { html += `<tr><td><strong>${esc(r.name)}</strong><div style="font-size:12px;color:var(--muted)">${esc(r.email || 'pas d\'email')}</div></td><td class="td-actions"><button class="btn btn-sm btn-primary" onclick="orgaApprove('${r.id}')">✅ Valider</button> <button class="btn btn-sm btn-danger" onclick="orgaReject('${r.id}')">🗑️</button></td></tr>`; }); html += `</tbody></table>`; }
+    else { html += `<table><tbody>`; pending.forEach(r => { html += `<tr><td><strong>${esc(r.name)}</strong><div style="font-size:12px;color:var(--muted)">${esc(r.email || 'pas d\'email')}</div>${r.note ? `<div style="font-size:12px;color:var(--text);margin-top:4px;padding:6px 8px;background:var(--surface);border-left:2px solid var(--yellow);border-radius:3px">💬 ${esc(r.note)}</div>` : ''}</td><td class="td-actions"><button class="btn btn-sm btn-primary" onclick="orgaApprove('${r.id}')">✅ Valider</button> <button class="btn btn-sm btn-danger" onclick="orgaReject('${r.id}')">🗑️</button></td></tr>`; }); html += `</tbody></table>`; }
     html += `</div>`;
     html += `<div class="card"><div class="card-title">✅ Validés (${approved.length})</div>`;
     if (!approved.length) html += `<div style="color:var(--muted)">Aucun joueur validé</div>`;
