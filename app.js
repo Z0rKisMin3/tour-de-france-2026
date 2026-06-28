@@ -297,7 +297,8 @@ async function loadAll() {
     enableLastClimbPrediction: s.enable_last_climb,
     enableGreenJerseyChangePrediction: s.enable_green_jersey,
     lockUntil: s.lock_until,
-    distanceKm: s.distance_km, elevationM: s.elevation_m, details: s.details, profileUrl: s.profile_url
+    distanceKm: s.distance_km, elevationM: s.elevation_m, details: s.details, profileUrl: s.profile_url,
+    profilePoints: s.profile_points
   }));
   db.players = players;
   db.pretourResults = ptres.length ? ptres[0].data : null;
@@ -993,6 +994,56 @@ function renderStages(el) {
 }
 
 const PT_ICON = { col: '⛰️', sprint: '🏁', depart: '🚩', arrivee: '🏆', cote: '↗️', ravito: '🥤' };
+
+// Profil d'altitude « maison » (SVG original, dessiné depuis profile_points [{km,alt,type,name,cat}])
+function elevationSVG(points) {
+  const pts = (points || []).filter(p => p && p.km != null && p.alt != null).sort((a, b) => a.km - b.km);
+  if (pts.length < 2) return '';
+  const W = 800, H = 230, padL = 40, padR = 14, padT = 26, padB = 30;
+  const kmMin = pts[0].km, kmMax = pts[pts.length - 1].km;
+  const alts = pts.map(p => p.alt);
+  let aMin = Math.min(...alts), aMax = Math.max(...alts);
+  const aPad = (aMax - aMin) * 0.18 || 50; aMin = Math.max(0, Math.floor((aMin - aPad) / 50) * 50); aMax = Math.ceil((aMax + aPad) / 50) * 50;
+  const x = km => padL + ((km - kmMin) / (kmMax - kmMin || 1)) * (W - padL - padR);
+  const y = al => padT + (1 - (al - aMin) / (aMax - aMin || 1)) * (H - padT - padB);
+  const baseY = y(aMin);
+  const linePts = pts.map(p => `${x(p.km).toFixed(1)},${y(p.alt).toFixed(1)}`).join(' ');
+  const area = `${padL.toFixed(1)},${baseY.toFixed(1)} ${linePts} ${x(kmMax).toFixed(1)},${baseY.toFixed(1)}`;
+
+  const COL = { sprint: '#2ecc71', col: '#E8373A', arrivee: '#FFD700', depart: '#888' };
+  let marks = '', lastLabelX = -999, hi = false;
+  pts.forEach(p => {
+    if (!p.type || p.type === 'pt') return;
+    const px = x(p.km), py = y(p.alt), c = COL[p.type] || '#888';
+    marks += `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="3.5" fill="${c}"/>`;
+    if (p.name) {
+      // évite le chevauchement des libellés en alternant la hauteur
+      const close = (px - lastLabelX) < 70; const dy = close && hi ? -20 : -9; hi = close ? !hi : false; lastLabelX = px;
+      // ancrage adapté pour ne pas déborder aux extrémités
+      let anchor = 'middle', tx = px;
+      if (px < padL + 45) { anchor = 'start'; tx = px - 4; }
+      else if (px > W - padR - 45) { anchor = 'end'; tx = px + 4; }
+      const lbl = (p.name.length > 16 ? p.name.slice(0, 15) + '…' : p.name) + (p.cat ? ' (' + p.cat + ')' : '');
+      marks += `<text x="${tx.toFixed(1)}" y="${(py + dy).toFixed(1)}" font-size="9.5" fill="#ddd" text-anchor="${anchor}">${esc(lbl)}</text>`;
+    }
+  });
+  // graduations altitude (min/max) + km début/fin
+  const grid = `
+    <line x1="${padL}" y1="${y(aMax).toFixed(1)}" x2="${W - padR}" y2="${y(aMax).toFixed(1)}" stroke="#333" stroke-dasharray="3 3"/>
+    <line x1="${padL}" y1="${baseY.toFixed(1)}" x2="${W - padR}" y2="${baseY.toFixed(1)}" stroke="#333"/>
+    <text x="4" y="${(y(aMax) + 3).toFixed(1)}" font-size="9" fill="#888">${aMax} m</text>
+    <text x="4" y="${(baseY + 3).toFixed(1)}" font-size="9" fill="#888">${aMin} m</text>
+    <text x="${padL}" y="${H - 10}" font-size="9" fill="#888" text-anchor="middle">0</text>
+    <text x="${(W - padR).toFixed(1)}" y="${H - 10}" font-size="9" fill="#888" text-anchor="end">${kmMax} km</text>`;
+
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;background:#141414;border:1px solid var(--border);border-radius:6px;margin-bottom:12px" xmlns="http://www.w3.org/2000/svg">
+    <defs><linearGradient id="elevGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFD70055"/><stop offset="1" stop-color="#FFD70008"/></linearGradient></defs>
+    ${grid}
+    <polygon points="${area}" fill="url(#elevGrad)"/>
+    <polyline points="${linePts}" fill="none" stroke="#FFD700" stroke-width="2" stroke-linejoin="round"/>
+    ${marks}
+  </svg>`;
+}
 function renderStageDetail(stageId) {
   const el = document.getElementById('mainContent');
   const s = db.stages.find(x => x.id === stageId);
@@ -1014,6 +1065,8 @@ function renderStageDetail(stageId) {
 
   // Points clés (cols, sprints…)
   html += `<div class="card"><div class="card-title">🗺️ Parcours & passages clés</div>`;
+  const svg = elevationSVG(s.profilePoints);
+  if (svg) html += svg;
   const pts = Array.isArray(s.details) ? [...s.details].sort((a, b) => (a.km || 0) - (b.km || 0)) : [];
   if (!pts.length) {
     html += `<div style="color:var(--muted);font-size:13px">Détail du parcours pas encore renseigné pour cette étape.</div>`;
