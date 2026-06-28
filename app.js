@@ -162,6 +162,13 @@ function boolSelect(name, sel) {
     <option value="oui" ${sel === 'oui' ? 'selected' : ''}>Oui</option>
     <option value="non" ${sel === 'non' ? 'selected' : ''}>Non</option></select>`;
 }
+// Vainqueur final du Tour → renseigne automatiquement le 1er du podium
+function onPreTourWinnerChange(sel) {
+  const form = sel.closest('form');
+  if (!form) return;
+  const p0 = form.querySelector('[name="pod0"]');
+  if (p0) p0.value = sel.value;
+}
 // Vainqueur d'étape → renseigne automatiquement le 1er du Top 3 et l'équipe du vainqueur
 function onStageWinnerChange(sel) {
   const rid = sel.value;
@@ -532,8 +539,8 @@ function renderPreTour(el) {
 
   html += `<form id="ptForm" onsubmit="savePreTour(event)">`;
   html += `<div class="pred-section"><div class="pred-section-title">🥇 Classement général</div>
-    <div class="form-group"><label>Vainqueur final <span class="pts-label">100 pts</span></label>${riderSelect('winner', pred.winner)}</div>
-    <div class="form-group"><label>Podium — 1er <span class="pts-label">→ 90 pts max</span></label>${riderSelect('pod0', pred.podium && pred.podium[0])}</div>
+    <div class="form-group"><label>Vainqueur final <span class="pts-label">100 pts</span></label>${riderSelect('winner', pred.winner, undefined, 'onchange="onPreTourWinnerChange(this)"')}</div>
+    <div class="form-group"><label>Podium — 1er <span class="pts-label">→ 90 pts max · rempli auto par le vainqueur</span></label>${riderSelect('pod0', pred.podium && pred.podium[0])}</div>
     <div class="form-group"><label>Podium — 2e</label>${riderSelect('pod1', pred.podium && pred.podium[1])}</div>
     <div class="form-group"><label>Podium — 3e</label>${riderSelect('pod2', pred.podium && pred.podium[2])}</div></div>`;
 
@@ -1096,7 +1103,7 @@ async function init() {
   // Expose pour onclick inline
   Object.assign(window, {
     showTab, openAuth, doRegister, doLogin, logout, toggleOrga, closeModal,
-    savePreTour, renderStageForm, saveStage, onStageWinnerChange, selectStage,
+    savePreTour, renderStageForm, saveStage, onStageWinnerChange, onPreTourWinnerChange, selectStage,
     renderScoreDetailContent, switchRiderTab,
     orgaAddTeam, orgaDelTeam, orgaAddRider, orgaDelRider, orgaToggleRider,
     renderTeamDetail, orgaSetLeader,
