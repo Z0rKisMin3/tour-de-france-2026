@@ -999,7 +999,7 @@ const PT_ICON = { col: '⛰️', sprint: '🏁', depart: '🚩', arrivee: '🏆'
 function elevationSVG(points) {
   const pts = (points || []).filter(p => p && p.km != null && p.alt != null).sort((a, b) => a.km - b.km);
   if (pts.length < 2) return '';
-  const W = 800, H = 230, padL = 40, padR = 14, padT = 26, padB = 30;
+  const W = 800, H = 256, padL = 40, padR = 14, padT = 54, padB = 30;
   const kmMin = pts[0].km, kmMax = pts[pts.length - 1].km;
   const alts = pts.map(p => p.alt);
   let aMin = Math.min(...alts), aMax = Math.max(...alts);
@@ -1011,22 +1011,32 @@ function elevationSVG(points) {
   const area = `${padL.toFixed(1)},${baseY.toFixed(1)} ${linePts} ${x(kmMax).toFixed(1)},${baseY.toFixed(1)}`;
 
   const COL = { sprint: '#2ecc71', col: '#E8373A', arrivee: '#FFD700', depart: '#888' };
-  let marks = '', lastLabelX = -999, hi = false;
+  let dots = '', labels = '';
+  const rowRight = [];          // x occupé le plus à droite pour chaque niveau d'étiquette
   pts.forEach(p => {
     if (!p.type || p.type === 'pt') return;
     const px = x(p.km), py = y(p.alt), c = COL[p.type] || '#888';
-    marks += `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="3.5" fill="${c}"/>`;
-    if (p.name) {
-      // évite le chevauchement des libellés en alternant la hauteur
-      const close = (px - lastLabelX) < 70; const dy = close && hi ? -20 : -9; hi = close ? !hi : false; lastLabelX = px;
-      // ancrage adapté pour ne pas déborder aux extrémités
-      let anchor = 'middle', tx = px;
-      if (px < padL + 45) { anchor = 'start'; tx = px - 4; }
-      else if (px > W - padR - 45) { anchor = 'end'; tx = px + 4; }
-      const lbl = (p.name.length > 16 ? p.name.slice(0, 15) + '…' : p.name) + (p.cat ? ' (' + p.cat + ')' : '');
-      marks += `<text x="${tx.toFixed(1)}" y="${(py + dy).toFixed(1)}" font-size="9.5" fill="#ddd" text-anchor="${anchor}">${esc(lbl)}</text>`;
-    }
+    dots += `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="3.5" fill="${c}"/>`;
+    if (!p.name) return;
+    const lbl = (p.name.length > 16 ? p.name.slice(0, 15) + '…' : p.name) + (p.cat ? ' (' + p.cat + ')' : '');
+    // ancrage adapté pour ne pas déborder aux extrémités
+    let anchor = 'middle', tx = px;
+    if (px < padL + 45) { anchor = 'start'; tx = px - 4; }
+    else if (px > W - padR - 45) { anchor = 'end'; tx = px + 4; }
+    // intervalle horizontal occupé par le texte (approx)
+    const w = lbl.length * 5.6;
+    const left = anchor === 'middle' ? tx - w / 2 : anchor === 'end' ? tx - w : tx;
+    const right = left + w;
+    // choisit le niveau le plus bas où l'étiquette ne chevauche pas la précédente
+    let lvl = 0;
+    while (rowRight[lvl] != null && left < rowRight[lvl] + 6) lvl++;
+    rowRight[lvl] = right;
+    const labelY = Math.max(9, py - 10 - lvl * 12);
+    // trait de liaison du point vers l'étiquette si elle est remontée
+    if (lvl > 0) labels += `<line x1="${px.toFixed(1)}" y1="${(py - 4).toFixed(1)}" x2="${px.toFixed(1)}" y2="${(labelY + 2).toFixed(1)}" stroke="#555" stroke-width="0.7"/>`;
+    labels += `<text x="${tx.toFixed(1)}" y="${labelY.toFixed(1)}" font-size="9.5" fill="#ddd" text-anchor="${anchor}">${esc(lbl)}</text>`;
   });
+  const marks = dots + labels;
   // graduations altitude (min/max) + km début/fin
   const grid = `
     <line x1="${padL}" y1="${y(aMax).toFixed(1)}" x2="${W - padR}" y2="${y(aMax).toFixed(1)}" stroke="#333" stroke-dasharray="3 3"/>
