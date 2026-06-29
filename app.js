@@ -494,6 +494,7 @@ function renderShell() {
     ['scores', '📊 Détail'],
     ['riders', '🚴 Coureurs'],
     ['stages', '📅 Étapes'],
+    ['chat', '💬 Chat'],
     ['rules', '📜 Règlement']
   ];
   if (orgaCode) {
@@ -509,13 +510,15 @@ function renderShell() {
 // ================================================================
 let currentTab = 'dashboard';
 function showTab(tab) {
+  if (tab !== 'chat' && chatPollInterval) { clearInterval(chatPollInterval); chatPollInterval = null; }
+  if (tab !== 'chat') document.getElementById('mainContent').classList.remove('chat-active');
   currentTab = tab;
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   const main = document.getElementById('mainContent');
   const r = {
     dashboard: renderDashboard, pronos: renderPronos,
     ranking: renderRanking, scores: renderScoreDetail, riders: renderRiders, stages: renderStages,
-    rules: renderRules, registrations: renderRegistrations, results: renderResults
+    chat: renderChat, rules: renderRules, registrations: renderRegistrations, results: renderResults
   }[tab];
   main.innerHTML = '';
   if (r) r(main);
@@ -574,7 +577,7 @@ function renderDashboard(el) {
   if (!upcoming.length) html += `<div class="empty-state"><p>Aucune étape à venir</p></div>`;
   else upcoming.slice(0, 5).forEach(s => {
     const ti = STAGE_TYPES[s.type] || STAGE_TYPES.plaine;
-    html += `<div class="stage-card" style="cursor:pointer" onclick="renderStageDetail('${s.id}')"><div class="stage-num">É${s.number}</div><div class="stage-info"><div class="stage-title">${esc(s.title)} ›</div><div class="stage-meta">${formatDate(s.date)} · ${shortTime(s.startTime)} · <span class="${ti.color}">${ti.label}</span></div></div><span class="badge badge-open">Ouvert</span></div>`;
+    html += `<div class="stage-card" style="cursor:pointer" onclick="renderStageDetail('${s.id}')"><div class="stage-num">É${s.number}</div><div class="stage-info"><div class="stage-title">${esc(s.title)}</div><div class="stage-meta">${formatDate(s.date)} · ${shortTime(s.startTime)} · <span class="${ti.color}">${ti.label}</span></div></div><span class="badge badge-open">Ouvert</span></div>`;
   });
   html += `</div>`;
 
@@ -582,7 +585,7 @@ function renderDashboard(el) {
   if (!done.length) html += `<div class="empty-state"><p>Aucun résultat encodé</p></div>`;
   else done.slice(0, 4).forEach(s => {
     const r = db.stageResults[s.id];
-    html += `<div class="stage-card" style="cursor:pointer" onclick="renderStageDetail('${s.id}')"><div class="stage-num">É${s.number}</div><div class="stage-info"><div class="stage-title">${esc(s.title)} ›</div><div class="stage-meta">Vainqueur : <strong>${esc(getRiderName(r.winner))}</strong></div></div><span class="badge badge-locked">Terminée</span></div>`;
+    html += `<div class="stage-card" style="cursor:pointer" onclick="renderStageDetail('${s.id}')"><div class="stage-num">É${s.number}</div><div class="stage-info"><div class="stage-title">${esc(s.title)}</div><div class="stage-meta">Vainqueur : <strong>${esc(getRiderName(r.winner))}</strong></div></div><span class="badge badge-locked">Terminée</span></div>`;
   });
   html += `</div>`;
 
@@ -1065,7 +1068,7 @@ function renderStages(el) {
   html += `<div class="alert alert-info" style="margin-bottom:10px">Clique sur une étape pour voir sa fiche (distance, dénivelé, cols & sprints, profil officiel).</div>`;
   db.stages.forEach(s => {
     const ti = STAGE_TYPES[s.type] || STAGE_TYPES.plaine; const locked = isStageLocked(s);
-    html += `<div class="stage-card" style="cursor:pointer" onclick="renderStageDetail('${s.id}')"><div class="stage-num" style="background:${locked ? '#2a1515' : 'var(--surface)'}">É${s.number}</div><div class="stage-info"><div class="stage-title">${esc(s.title)} ›</div><div class="stage-meta">${formatDate(s.date)} · ${shortTime(s.startTime)} · <span class="${ti.color}">${ti.label}</span>${s.distanceKm ? ' · ' + s.distanceKm + ' km' : ''} · <span class="coeff-badge">×${ti.coefficient.toFixed(2)}</span>${s.enableLastClimbPrediction ? ' · ⛰️' : ''}${s.enableGreenJerseyChangePrediction ? ' · 🟢' : ''}</div></div><div class="stage-actions" onclick="event.stopPropagation()"><span class="badge ${locked ? 'badge-locked' : 'badge-open'}">${locked ? '🔒' : '🟢'}</span>${orgaCode ? `<button class="btn btn-sm btn-outline" onclick="orgaStageModal('${s.id}')">✏️</button>` : ''}</div></div>`;
+    html += `<div class="stage-card" style="cursor:pointer" onclick="renderStageDetail('${s.id}')"><div class="stage-num" style="background:${locked ? '#2a1515' : 'var(--surface)'}">É${s.number}</div><div class="stage-info"><div class="stage-title">${esc(s.title)}</div><div class="stage-meta">${formatDate(s.date)} · ${shortTime(s.startTime)} · <span class="${ti.color}">${ti.label}</span>${s.distanceKm ? ' · ' + s.distanceKm + ' km' : ''} · <span class="coeff-badge">×${ti.coefficient.toFixed(2)}</span>${s.enableLastClimbPrediction ? ' · ⛰️' : ''}${s.enableGreenJerseyChangePrediction ? ' · 🟢' : ''}</div></div><div class="stage-actions" onclick="event.stopPropagation()"><span class="badge ${locked ? 'badge-locked' : 'badge-open'}">${locked ? '🔒' : '🟢'}</span>${orgaCode ? `<button class="btn btn-sm btn-outline" onclick="orgaStageModal('${s.id}')">✏️</button>` : ''}</div></div>`;
   });
   el.innerHTML = html;
 }
@@ -1356,6 +1359,259 @@ async function delOrgaStageResult(id) {
 }
 
 // ================================================================
+// CHAT
+// ================================================================
+const CHAT_EMOJIS = ['👍','❤️','😂','😮','🔥','🚴','👏','😢'];
+const CHAT_AVATAR_COLORS = ['#e85d04','#2a9d8f','#e63946','#457b9d','#6a4c93','#f77f00','#06a77d','#c77dff'];
+let chatMessages = [];
+let chatReplyTo = null;
+let chatPollInterval = null;
+
+function chatAvatarStyle(name) {
+  const i = name ? name.charCodeAt(0) % CHAT_AVATAR_COLORS.length : 0;
+  return `background:${CHAT_AVATAR_COLORS[i]}`;
+}
+
+function chatRenderText(raw) {
+  let html = esc(raw);
+  db.players.filter(p => p.name)
+    .sort((a, b) => b.name.length - a.name.length)
+    .forEach(p => {
+      const safe = esc(p.name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      html = html.replace(new RegExp('@' + safe, 'gi'),
+        `<span class="chat-mention">@${esc(p.name)}</span>`);
+    });
+  return html;
+}
+
+async function loadChatMessages() {
+  const data = await rpc('get_chat_messages', { p_limit: 150 });
+  chatMessages = Array.isArray(data) ? data : [];
+}
+
+async function renderChat(el) {
+  el.classList.add('chat-active');
+  if (!session || !session.approved) {
+    el.innerHTML = `<div class="alert alert-info" style="margin:16px">${session ? 'Ton compte est en attente d\'approbation.' : 'Connecte-toi pour accéder au chat.'}</div>`;
+    return;
+  }
+  el.innerHTML = `<div class="loading" style="padding:24px">Chargement…</div>`;
+  try { await loadChatMessages(); } catch { chatMessages = []; }
+
+  el.innerHTML = `
+    <div id="chatContainer">
+      <div class="chat-messages" id="chatMessages"></div>
+      <div class="chat-compose">
+        <div id="chatReplyBar" class="chat-reply-bar" style="display:none">
+          <span id="chatReplyText"></span>
+          <button class="chat-action-btn" onclick="cancelChatReply()">✕</button>
+        </div>
+        <div class="chat-compose-row">
+          <div id="mentionDropdown" class="mention-dropdown" style="display:none"></div>
+          <textarea id="chatInput" class="chat-input" rows="1"
+            placeholder="Écris un message… @ pour taguer"
+            oninput="onChatInput(this)" onkeydown="onChatKey(event)"></textarea>
+          <button class="chat-send-btn" id="chatSendBtn" onclick="submitChat()">➤</button>
+        </div>
+      </div>
+    </div>`;
+
+  paintChat(false);
+
+  if (chatPollInterval) clearInterval(chatPollInterval);
+  chatPollInterval = setInterval(async () => {
+    if (currentTab !== 'chat') return;
+    const box = document.getElementById('chatMessages');
+    const atBottom = !box || (box.scrollHeight - box.scrollTop - box.clientHeight) < 80;
+    try { await loadChatMessages(); } catch {}
+    paintChat(!atBottom);
+  }, 8000);
+}
+
+function paintChat(keepScroll = false) {
+  const box = document.getElementById('chatMessages');
+  if (!box) return;
+  const wasAtBottom = !keepScroll || (box.scrollHeight - box.scrollTop - box.clientHeight) < 80;
+
+  if (!chatMessages.length) {
+    box.innerHTML = `<div class="chat-empty">Aucun message pour l'instant — soyez le premier ! 💬</div>`;
+    return;
+  }
+
+  box.innerHTML = chatMessages.map(m => {
+    const isOwn = session && m.player_id === session.id;
+    const initial = (m.player_name || '?')[0].toUpperCase();
+    const d = new Date(m.created_at);
+    const now = new Date();
+    const timeStr = d.toDateString() === now.toDateString()
+      ? d.toLocaleTimeString('fr-BE', { hour: '2-digit', minute: '2-digit' })
+      : d.toLocaleDateString('fr-BE', { day: 'numeric', month: 'short' }) + ' · ' +
+        d.toLocaleTimeString('fr-BE', { hour: '2-digit', minute: '2-digit' });
+
+    const replyHtml = m.reply_player_name
+      ? `<div class="chat-reply-preview">↩ <strong>${esc(m.reply_player_name)}</strong> : ${esc((m.reply_message || '').slice(0, 70))}${(m.reply_message || '').length > 70 ? '…' : ''}</div>`
+      : '';
+
+    const rmap = {};
+    (m.reactions || []).forEach(r => {
+      if (!rmap[r.emoji]) rmap[r.emoji] = { count: 0, names: [], mine: false };
+      rmap[r.emoji].count++;
+      rmap[r.emoji].names.push(r.player_name);
+      if (session && r.player_id === session.id) rmap[r.emoji].mine = true;
+    });
+    const reactHtml = Object.entries(rmap).map(([emoji, d]) =>
+      `<button class="reaction-pill${d.mine ? ' mine' : ''}" title="${esc(d.names.join(', '))}"
+         onclick="chatToggleReaction('${m.id}','${emoji}')">${emoji} ${d.count}</button>`
+    ).join('') + `<button class="reaction-add" onclick="openChatEmojiPicker('${m.id}',this)">＋</button>`;
+
+    return `
+      <div class="chat-msg${isOwn ? ' own' : ''}" data-id="${m.id}">
+        <div class="chat-avatar" style="${chatAvatarStyle(m.player_name)}">${initial}</div>
+        <div class="chat-bubble-wrap">
+          <div class="chat-meta"><span class="chat-name">${esc(m.player_name)}</span> <span class="chat-time">${timeStr}</span></div>
+          ${replyHtml}
+          <div class="chat-bubble">${chatRenderText(m.message)}</div>
+          <div class="chat-reactions">${reactHtml}</div>
+          <div class="chat-msg-actions">
+            <button class="chat-action-btn" onclick="chatReply('${m.id}')">↩ Répondre</button>
+            ${isOwn ? `<button class="chat-action-btn" onclick="chatDelete('${m.id}')">🗑️ Supprimer</button>` : ''}
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+
+  if (wasAtBottom) box.scrollTop = box.scrollHeight;
+}
+
+async function submitChat() {
+  if (!session || !session.approved) return;
+  const input = document.getElementById('chatInput');
+  const msg = (input?.value || '').trim();
+  if (!msg) return;
+  const btn = document.getElementById('chatSendBtn');
+  if (btn) btn.disabled = true;
+  try {
+    await rpc('send_chat_message', {
+      p_token: session.token,
+      p_message: msg,
+      p_reply_to: chatReplyTo ? chatReplyTo.id : null
+    });
+    input.value = '';
+    input.style.height = 'auto';
+    cancelChatReply();
+    await loadChatMessages();
+    paintChat(false);
+  } catch (e) {
+    showToast(e.message, 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+    input?.focus();
+  }
+}
+
+async function chatToggleReaction(msgId, emoji) {
+  if (!session || !session.approved) return showToast('Connecte-toi pour réagir', 'error');
+  closeChatEmojiPicker();
+  try {
+    await rpc('toggle_chat_reaction', { p_token: session.token, p_message_id: msgId, p_emoji: emoji });
+    await loadChatMessages();
+    paintChat(true);
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+function openChatEmojiPicker(msgId, btn) {
+  closeChatEmojiPicker();
+  const rect = btn.getBoundingClientRect();
+  const picker = document.createElement('div');
+  picker.className = 'emoji-picker'; picker.id = 'chatEmojiPicker';
+  const left = Math.min(rect.left, window.innerWidth - 290);
+  const top = rect.top - 52;
+  picker.style.cssText = `position:fixed;left:${left}px;top:${top < 8 ? rect.bottom + 4 : top}px`;
+  CHAT_EMOJIS.forEach(e => {
+    const b = document.createElement('button');
+    b.textContent = e;
+    b.onclick = ev => { ev.stopPropagation(); chatToggleReaction(msgId, e); };
+    picker.appendChild(b);
+  });
+  document.body.appendChild(picker);
+  setTimeout(() => document.addEventListener('click', closeChatEmojiPicker, { once: true }), 0);
+}
+
+function closeChatEmojiPicker() { document.getElementById('chatEmojiPicker')?.remove(); }
+
+function chatReply(msgId) {
+  const m = chatMessages.find(x => x.id === msgId);
+  if (!m) return;
+  chatReplyTo = { id: msgId };
+  const bar = document.getElementById('chatReplyBar');
+  const txt = document.getElementById('chatReplyText');
+  if (bar && txt) {
+    txt.innerHTML = `↩ <strong>${esc(m.player_name)}</strong> : ${esc(m.message.slice(0, 80))}${m.message.length > 80 ? '…' : ''}`;
+    bar.style.display = 'flex';
+  }
+  document.getElementById('chatInput')?.focus();
+}
+
+function cancelChatReply() {
+  chatReplyTo = null;
+  const bar = document.getElementById('chatReplyBar');
+  if (bar) bar.style.display = 'none';
+}
+
+async function chatDelete(msgId) {
+  if (!confirm('Supprimer ce message ?')) return;
+  try {
+    await rpc('delete_chat_message', { p_token: session.token, p_message_id: msgId });
+    chatMessages = chatMessages.filter(m => m.id !== msgId);
+    paintChat(true);
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+function onChatInput(ta) {
+  ta.style.height = 'auto';
+  ta.style.height = Math.min(ta.scrollHeight, 100) + 'px';
+  const before = ta.value.slice(0, ta.selectionStart);
+  const m = before.match(/@(\w*)$/);
+  if (m) showMentionDrop(m[1].toLowerCase());
+  else hideMentionDrop();
+}
+
+function onChatKey(e) {
+  const drop = document.getElementById('mentionDropdown');
+  if (drop && drop.style.display !== 'none' && e.key === 'Escape') {
+    hideMentionDrop(); e.preventDefault(); return;
+  }
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitChat(); }
+}
+
+function showMentionDrop(q) {
+  const drop = document.getElementById('mentionDropdown');
+  if (!drop) return;
+  const hits = db.players.filter(p => p.approved && p.name && p.name.toLowerCase().includes(q)).slice(0, 6);
+  if (!hits.length) { hideMentionDrop(); return; }
+  drop.innerHTML = hits.map(p =>
+    `<div class="mention-item" onclick="insertMention('${esc(p.name)}')">${esc(p.name)}</div>`
+  ).join('');
+  drop.style.display = 'block';
+}
+
+function hideMentionDrop() {
+  const d = document.getElementById('mentionDropdown');
+  if (d) d.style.display = 'none';
+}
+
+function insertMention(name) {
+  const ta = document.getElementById('chatInput');
+  if (!ta) return;
+  const pos = ta.selectionStart;
+  const before = ta.value.slice(0, pos).replace(/@\w*$/, `@${name} `);
+  ta.value = before + ta.value.slice(pos);
+  ta.selectionStart = ta.selectionEnd = before.length;
+  hideMentionDrop();
+  ta.focus();
+}
+
+// ================================================================
 // INIT
 // ================================================================
 async function init() {
@@ -1368,6 +1624,14 @@ async function init() {
     return;
   }
   renderShell();
+  // Ajuste le top de la nav selon la vraie hauteur du header (variable sur mobile)
+  function updateNavTop() {
+    const h = document.querySelector('header');
+    const nav = document.getElementById('mainNav');
+    if (h && nav) nav.style.top = h.offsetHeight + 'px';
+  }
+  updateNavTop();
+  window.addEventListener('resize', updateNavTop);
   showTab('dashboard');
 
   // Expose pour onclick inline
@@ -1380,7 +1644,9 @@ async function init() {
     renderTeamDetail, orgaSetLeader, renderStageDetail,
     orgaStageModal, orgaSaveStage,
     switchResultTab, renderStageResultForm, saveOrgaPreResult, saveOrgaStageResult, delOrgaStageResult,
-    orgaApprove, orgaRevoke, orgaReject, orgaResetPass
+    orgaApprove, orgaRevoke, orgaReject, orgaResetPass,
+    submitChat, chatToggleReaction, openChatEmojiPicker, chatReply, cancelChatReply, chatDelete,
+    onChatInput, onChatKey, insertMention
   });
 }
 window.addEventListener('DOMContentLoaded', init);
