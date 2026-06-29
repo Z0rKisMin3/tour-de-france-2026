@@ -1215,7 +1215,7 @@ async function orgaSaveStage(id) {
   try {
     await rpc('admin_upsert_stage', { p_code: orgaCode, p_id: id, p_number: num, p_date: date, p_start_time: time, p_title: title, p_type: type, p_coefficient: STAGE_TYPES[type].coefficient, p_last_climb: document.getElementById('stgClimb').checked, p_green: document.getElementById('stgGreen').checked });
     const stages = await sbSelect('stages', 'select=*&order=number.asc');
-    db.stages = stages.map(s => ({ id: s.id, number: s.number, date: s.date, startTime: s.start_time, title: s.title, type: s.type, coefficient: Number(s.coefficient), enableLastClimbPrediction: s.enable_last_climb, enableGreenJerseyChangePrediction: s.enable_green_jersey, lockUntil: s.lock_until }));
+    db.stages = stages.map(s => ({ id: s.id, number: s.number, date: s.date, startTime: s.start_time, title: s.title, type: s.type, coefficient: Number(s.coefficient), enableLastClimbPrediction: s.enable_last_climb, enableGreenJerseyChangePrediction: s.enable_green_jersey, lockUntil: s.lock_until, distanceKm: s.distance_km, elevationM: s.elevation_m, details: s.details, profileUrl: s.profile_url, profilePoints: s.profile_points }));
     closeModal(); showTab('stages'); showToast('Étape enregistrée', 'success');
   } catch (e) { showToast(e.message, 'error'); }
 }
