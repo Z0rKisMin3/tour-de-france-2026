@@ -499,12 +499,12 @@ function renderShell() {
     ['riders', '🚴 Coureurs'],
     ['stages', '📅 Étapes'],
     ['chat', '💬 Chat'],
+    ['coverage', '📋 Suivi'],
     ['rules', '📜 Règlement']
   ];
   if (orgaCode) {
     tabs.push(['registrations', '🛂 Joueurs']);
     tabs.push(['results', '✅ Résultats']);
-    tabs.push(['coverage', '📋 Suivi']);
   }
   document.getElementById('navInner').innerHTML = tabs.map(([id, label]) =>
     `<button class="tab-btn ${id === currentTab ? 'active' : ''}" data-tab="${id}" onclick="showTab('${id}')">${label}</button>`).join('');
@@ -523,8 +523,8 @@ function showTab(tab) {
   const r = {
     dashboard: renderDashboard, pronos: renderPronos,
     ranking: renderRanking, scores: renderScoreDetail, riders: renderRiders, stages: renderStages,
-    chat: renderChat, rules: renderRules, registrations: renderRegistrations, results: renderResults,
-    coverage: renderCoverage
+    chat: renderChat, coverage: renderCoverage, rules: renderRules,
+    registrations: renderRegistrations, results: renderResults
   }[tab];
   main.innerHTML = '';
   if (r) r(main);
@@ -1271,7 +1271,7 @@ async function renderCoverage(el) {
   el.innerHTML = '<div class="card"><p style="color:var(--muted)">Chargement du suivi…</p></div>';
   let data;
   try {
-    data = await rpc('admin_prediction_status', { p_code: orgaCode });
+    data = await rpc('get_prediction_status', {});
   } catch (e) {
     el.innerHTML = `<div class="alert alert-danger">${esc(e.message)}</div>`; return;
   }
@@ -1766,7 +1766,7 @@ async function init() {
 }
 window.addEventListener('DOMContentLoaded', init);
 
-const APP_VERSION = '25';
+const APP_VERSION = '26';
 async function checkVersion() {
   try {
     const r = await fetch('version.txt?t=' + Date.now());
