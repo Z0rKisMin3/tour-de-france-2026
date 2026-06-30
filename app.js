@@ -1678,3 +1678,22 @@ async function init() {
   });
 }
 window.addEventListener('DOMContentLoaded', init);
+
+const APP_VERSION = '24';
+async function checkVersion() {
+  try {
+    const r = await fetch('version.txt?t=' + Date.now());
+    if (!r.ok) return;
+    const v = (await r.text()).trim();
+    if (v !== APP_VERSION) showUpdateBanner();
+  } catch {}
+}
+function showUpdateBanner() {
+  if (document.getElementById('updateBanner')) return;
+  const el = document.createElement('div');
+  el.id = 'updateBanner';
+  el.innerHTML = '🔄 Nouvelle version disponible — <strong>Appuie ici pour recharger</strong>';
+  el.onclick = () => window.location.reload(true);
+  document.body.appendChild(el);
+}
+setInterval(checkVersion, 5 * 60 * 1000);
