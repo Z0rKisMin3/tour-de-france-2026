@@ -238,8 +238,12 @@ function calculatePreTourScore(pred, res) {
 }
 function calculateStageRawScore(pred, res, stage) {
   if (!pred || !res || !stage) return { raw: 0, detail: {} };
-  const d = {};
   const eq = (a, b) => a && b && a === b;
+  if (stage.number === 1) {
+    const d = { winner: eq(pred.teamWinner, res.winnerTeam) ? 25 : 0 };
+    return { raw: d.winner, detail: d };
+  }
+  const d = {};
   d.winner = eq(pred.stageWinner, res.winner) ? 25 : 0;
   d.top3 = getStageTop3Score(pred.stageTop3, res.top3);
   if (stage.type !== 'clm') d.finishType = eq(pred.finishType, res.finishType) ? 10 : 0;
@@ -755,23 +759,29 @@ function renderStageForm() {
   let html = `<div class="alert alert-info">Étape ${stage.number} · <strong>${esc(stage.title)}</strong> · ${formatDate(stage.date)} ${shortTime(stage.startTime)} · <span class="${ti.color}">${ti.label}</span> · ×${ti.coefficient.toFixed(2)}${locked ? ' · <strong>🔒 VERROUILLÉE</strong>' : ''}</div>`;
   html += `<form id="spForm" onsubmit="saveStage(event,'${stageId}')">`;
 
-  html += `<div class="pred-section"><div class="pred-section-title">🏁 Résultat de l'étape</div>
-    <div class="form-group"><label>Vainqueur <span class="pts-label">25 pts</span></label>${riderSelect('stageWinner', pred.stageWinner, undefined, 'onchange="onStageWinnerChange(this)"')}</div>
-    <div class="form-group"><label>Top 3 — 1er <span class="pts-label">→ 20 max · rempli auto par le vainqueur</span></label>${riderSelect('top3_0', pred.stageTop3 && pred.stageTop3[0])}</div>
-    <div class="form-group"><label>Top 3 — 2e</label>${riderSelect('top3_1', pred.stageTop3 && pred.stageTop3[1])}</div>
-    <div class="form-group"><label>Top 3 — 3e</label>${riderSelect('top3_2', pred.stageTop3 && pred.stageTop3[2])}</div>
-    ${stage.type !== 'clm' ? `<div class="form-group"><label>Type d'arrivée <span class="pts-label">10 pts</span></label><select name="finishType"><option value="">— Choisir —</option>${FINISH_TYPES.map(t => `<option value="${esc(t)}" ${t === pred.finishType ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></div>` : ''}
-    <div class="form-group"><label>Équipe du vainqueur <span class="pts-label">5 pts · rempli auto</span></label>${teamSelect('winnerTeam', pred.winnerTeam)}</div></div>`;
+  if (stage.number === 1) {
+    html += `<div class="pred-section"><div class="pred-section-title">🏆 CLM équipes — Équipe gagnante</div>
+      <div class="alert alert-info" style="font-size:12px">Contre-la-montre par équipes : pronostic réduit à l'équipe gagnante uniquement (25 pts).</div>
+      <div class="form-group"><label>Équipe gagnante <span class="pts-label">25 pts</span></label>${teamSelect('teamWinner', pred.teamWinner)}</div></div>`;
+  } else {
+    html += `<div class="pred-section"><div class="pred-section-title">🏁 Résultat de l'étape</div>
+      <div class="form-group"><label>Vainqueur <span class="pts-label">25 pts</span></label>${riderSelect('stageWinner', pred.stageWinner, undefined, 'onchange="onStageWinnerChange(this)"')}</div>
+      <div class="form-group"><label>Top 3 — 1er <span class="pts-label">→ 20 max · rempli auto par le vainqueur</span></label>${riderSelect('top3_0', pred.stageTop3 && pred.stageTop3[0])}</div>
+      <div class="form-group"><label>Top 3 — 2e</label>${riderSelect('top3_1', pred.stageTop3 && pred.stageTop3[1])}</div>
+      <div class="form-group"><label>Top 3 — 3e</label>${riderSelect('top3_2', pred.stageTop3 && pred.stageTop3[2])}</div>
+      ${stage.type !== 'clm' ? `<div class="form-group"><label>Type d'arrivée <span class="pts-label">10 pts</span></label><select name="finishType"><option value="">— Choisir —</option>${FINISH_TYPES.map(t => `<option value="${esc(t)}" ${t === pred.finishType ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></div>` : ''}
+      <div class="form-group"><label>Équipe du vainqueur <span class="pts-label">5 pts · rempli auto</span></label>${teamSelect('winnerTeam', pred.winnerTeam)}</div></div>`;
 
-  html += `<div class="pred-section"><div class="pred-section-title">🟡 Maillot jaune</div>
-    <div class="form-group"><label>Porteur après l'étape <span class="pts-label">10 pts</span></label>${riderSelect('yellowJerseyAfter', pred.yellowJerseyAfter)}</div>
-    <div class="form-group"><label>Le maillot jaune change-t-il ? <span class="pts-label">5 pts</span></label>${boolSelect('yellowChanged', pred.yellowChanged)}</div></div>`;
+    html += `<div class="pred-section"><div class="pred-section-title">🟡 Maillot jaune</div>
+      <div class="form-group"><label>Porteur après l'étape <span class="pts-label">10 pts</span></label>${riderSelect('yellowJerseyAfter', pred.yellowJerseyAfter)}</div>
+      <div class="form-group"><label>Le maillot jaune change-t-il ? <span class="pts-label">5 pts</span></label>${boolSelect('yellowChanged', pred.yellowChanged)}</div></div>`;
 
-  html += `<div class="pred-section"><div class="pred-section-title">📊 Compléments</div>
-    <div class="form-group"><label>Vainqueur issu de l'échappée ? <span class="pts-label">5 pts</span></label>${boolSelect('winnerFromBreakaway', pred.winnerFromBreakaway)}</div>
-    <div class="form-group"><label>Écart 1er/2e <span class="pts-label">5 pts</span></label>${rangeSelect('gapRange', pred.gapRange, STAGE_GAP_RANGES)}</div>
-    <div class="form-group"><label>Plus combatif <span class="pts-label">5 pts</span></label>${riderSelect('mostCombative', pred.mostCombative)}</div>
-    <div class="form-group"><label>Temps du vainqueur (hh:mm) <span class="pts-label">5 pts</span></label><input type="time" name="winnerTime" value="${esc(pred.winnerTime || '')}"></div></div>`;
+    html += `<div class="pred-section"><div class="pred-section-title">📊 Compléments</div>
+      <div class="form-group"><label>Vainqueur issu de l'échappée ? <span class="pts-label">5 pts</span></label>${boolSelect('winnerFromBreakaway', pred.winnerFromBreakaway)}</div>
+      <div class="form-group"><label>Écart 1er/2e <span class="pts-label">5 pts</span></label>${rangeSelect('gapRange', pred.gapRange, STAGE_GAP_RANGES)}</div>
+      <div class="form-group"><label>Plus combatif <span class="pts-label">5 pts</span></label>${riderSelect('mostCombative', pred.mostCombative)}</div>
+      <div class="form-group"><label>Temps du vainqueur (hh:mm) <span class="pts-label">5 pts</span></label><input type="time" name="winnerTime" value="${esc(pred.winnerTime || '')}"></div></div>`;
+  }
 
   if (stage.enableLastClimbPrediction)
     html += `<div class="pred-section"><div class="pred-section-title">⛰️ Dernière ascension</div><div class="form-group"><label>Premier au sommet <span class="pts-label">5 pts</span></label>${riderSelect('lastClimbFirst', pred.lastClimbFirst)}</div></div>`;
@@ -802,16 +812,23 @@ async function resetStage(stageId) {
 
 async function saveStage(e, stageId) {
   e.preventDefault();
+  const stage = db.stages.find(s => s.id === stageId);
   const f = e.target, fv = n => { const el = f.querySelector(`[name="${n}"]`); return el ? el.value : ''; };
-  const top3 = [fv('top3_0'), fv('top3_1'), fv('top3_2')];
-  if (!validateUniqueSelection(top3)) return showToast('Le Top 3 contient des doublons', 'error');
-  const data = {
-    stageWinner: fv('stageWinner'), stageTop3: top3, finishType: fv('finishType'),
-    yellowJerseyAfter: fv('yellowJerseyAfter'), yellowChanged: fv('yellowChanged'),
-    winnerFromBreakaway: fv('winnerFromBreakaway'),
-    gapRange: fv('gapRange'), winnerTeam: fv('winnerTeam'), mostCombative: fv('mostCombative'),
-    winnerTime: fv('winnerTime'), lastClimbFirst: fv('lastClimbFirst'), greenChanged: fv('greenChanged')
-  };
+  let data;
+  if (stage && stage.number === 1) {
+    if (!fv('teamWinner')) return showToast('Choisis une équipe gagnante', 'error');
+    data = { teamWinner: fv('teamWinner') };
+  } else {
+    const top3 = [fv('top3_0'), fv('top3_1'), fv('top3_2')];
+    if (!validateUniqueSelection(top3)) return showToast('Le Top 3 contient des doublons', 'error');
+    data = {
+      stageWinner: fv('stageWinner'), stageTop3: top3, finishType: fv('finishType'),
+      yellowJerseyAfter: fv('yellowJerseyAfter'), yellowChanged: fv('yellowChanged'),
+      winnerFromBreakaway: fv('winnerFromBreakaway'),
+      gapRange: fv('gapRange'), winnerTeam: fv('winnerTeam'), mostCombative: fv('mostCombative'),
+      winnerTime: fv('winnerTime'), lastClimbFirst: fv('lastClimbFirst'), greenChanged: fv('greenChanged')
+    };
+  }
   try {
     await rpc('save_stage_prediction', { p_token: session.token, p_stage_id: stageId, p_data: data });
     myStages[stageId] = data; db.stagePredictions[session.id + '_' + stageId] = data;
@@ -905,20 +922,25 @@ function renderScoreDetailContent() {
     else if (!srr) html += `<div style="color:var(--muted)">En attente du résultat officiel</div>`;
     else {
       const { raw, detail } = calculateStageRawScore(sp, srr, stage);
-      const F = [
-        ['winner', 'Vainqueur', 25, getRiderName(sp.stageWinner), getRiderName(srr.winner)],
-        ['top3', 'Top 3', 20, (sp.stageTop3 || []).map(getRiderName).join(', '), (srr.top3 || []).map(getRiderName).join(', ')],
-        ['yellowJersey', 'Maillot jaune après', 10, getRiderName(sp.yellowJerseyAfter), getRiderName(srr.yellowJerseyAfter)],
-        ['yellowChanged', 'Jaune change ?', 5, sp.yellowChanged, srr.yellowChanged],
-        ['fromBreakaway', 'Échappée ?', 5, sp.winnerFromBreakaway, srr.winnerFromBreakaway],
-        ['gapRange', 'Écart 1er/2e', 5, sp.gapRange, srr.gapRange],
-        ['winnerTeam', 'Équipe vainqueur', 5, getTeamName(sp.winnerTeam), getTeamName(srr.winnerTeam)],
-        ['mostCombative', 'Plus combatif', 5, getRiderName(sp.mostCombative), getRiderName(srr.mostCombative)],
-        ['winnerTime', 'Temps vainqueur', 5, sp.winnerTime, srr.winnerTime]
-      ];
-      if (stage.type !== 'clm') F.splice(2, 0, ['finishType', "Type d'arrivée", 10, sp.finishType, srr.finishType]);
-      if (stage.enableLastClimbPrediction) F.push(['lastClimb', 'Sommet dernière ascension', 5, getRiderName(sp.lastClimbFirst), getRiderName(srr.lastClimbFirst)]);
-      if (stage.enableGreenJerseyChangePrediction) F.push(['greenChanged', 'Vert change ?', 5, sp.greenChanged, srr.greenChanged]);
+      let F;
+      if (stage.number === 1) {
+        F = [['winner', 'Équipe gagnante (CLM équipes)', 25, getTeamName(sp.teamWinner), getTeamName(srr.winnerTeam)]];
+      } else {
+        F = [
+          ['winner', 'Vainqueur', 25, getRiderName(sp.stageWinner), getRiderName(srr.winner)],
+          ['top3', 'Top 3', 20, (sp.stageTop3 || []).map(getRiderName).join(', '), (srr.top3 || []).map(getRiderName).join(', ')],
+          ['yellowJersey', 'Maillot jaune après', 10, getRiderName(sp.yellowJerseyAfter), getRiderName(srr.yellowJerseyAfter)],
+          ['yellowChanged', 'Jaune change ?', 5, sp.yellowChanged, srr.yellowChanged],
+          ['fromBreakaway', 'Échappée ?', 5, sp.winnerFromBreakaway, srr.winnerFromBreakaway],
+          ['gapRange', 'Écart 1er/2e', 5, sp.gapRange, srr.gapRange],
+          ['winnerTeam', 'Équipe vainqueur', 5, getTeamName(sp.winnerTeam), getTeamName(srr.winnerTeam)],
+          ['mostCombative', 'Plus combatif', 5, getRiderName(sp.mostCombative), getRiderName(srr.mostCombative)],
+          ['winnerTime', 'Temps vainqueur', 5, sp.winnerTime, srr.winnerTime]
+        ];
+        if (stage.type !== 'clm') F.splice(2, 0, ['finishType', "Type d'arrivée", 10, sp.finishType, srr.finishType]);
+        if (stage.enableLastClimbPrediction) F.push(['lastClimb', 'Sommet dernière ascension', 5, getRiderName(sp.lastClimbFirst), getRiderName(srr.lastClimbFirst)]);
+        if (stage.enableGreenJerseyChangePrediction) F.push(['greenChanged', 'Vert change ?', 5, sp.greenChanged, srr.greenChanged]);
+      }
       F.forEach(([k, label, max, pv, rv]) => {
         const p = detail[k] != null ? detail[k] : null;
         const cls = p == null ? '' : p === max ? 'perfect' : p > 0 ? '' : 'zero';
@@ -1323,28 +1345,34 @@ function renderStageResultForm() {
   const id = document.getElementById('resStage').value; const area = document.getElementById('resStageArea');
   if (!id) { area.innerHTML = ''; return; }
   const stage = db.stages.find(s => s.id === id); const r = db.stageResults[id] || {};
-  let html = `<div class="card"><div class="card-title">Résultat — Étape ${stage.number} : ${esc(stage.title)}</div><form id="srForm" onsubmit="saveOrgaStageResult(event,'${id}')">
-    <div class="pred-section"><div class="pred-section-title">🏁 Résultat</div>
+  let html = `<div class="card"><div class="card-title">Résultat — Étape ${stage.number} : ${esc(stage.title)}</div><form id="srForm" onsubmit="saveOrgaStageResult(event,'${id}')">`;
+  if (stage.number === 1) {
+    html += `<div class="pred-section"><div class="pred-section-title">🏆 CLM équipes — Résultat</div>
+      <div class="alert alert-info" style="font-size:12px">Étape 1 — CLM équipes : saisir uniquement l'équipe gagnante.</div>
+      <div class="form-group"><label>Équipe gagnante</label>${teamSelect('winnerTeam', r.winnerTeam)}</div></div>`;
+  } else {
+    html += `<div class="pred-section"><div class="pred-section-title">🏁 Résultat</div>
       <div class="form-group"><label>Vainqueur</label>${riderSelect('winner', r.winner, undefined, 'onchange="onStageWinnerChange(this)"')}</div>
       <div class="form-group"><label>Top 3 — 1er</label>${riderSelect('top3_0', r.top3 && r.top3[0])}</div>
       <div class="form-group"><label>Top 3 — 2e</label>${riderSelect('top3_1', r.top3 && r.top3[1])}</div>
       <div class="form-group"><label>Top 3 — 3e</label>${riderSelect('top3_2', r.top3 && r.top3[2])}</div>
       ${stage.type !== 'clm' ? `<div class="form-group"><label>Type d'arrivée</label><select name="finishType"><option value="">—</option>${FINISH_TYPES.map(t => `<option value="${esc(t)}" ${t === r.finishType ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></div>` : ''}
-      <div class="form-group"><label>Équipe vainqueur</label>${teamSelect('winnerTeam', r.winnerTeam)}</div></div>
-    <div class="pred-section"><div class="pred-section-title">🟡 Maillot jaune</div>
-      <div class="form-group"><label>Porteur après</label>${riderSelect('yellowJerseyAfter', r.yellowJerseyAfter)}</div>
-      <div class="form-group"><label>Jaune change ?</label>${boolSelect('yellowChanged', r.yellowChanged)}</div></div>
-    <div class="pred-section"><div class="pred-section-title">🎽 Maillots après l'étape <span style="font-weight:400;color:var(--muted)">(info, non noté)</span></div>
-      <div class="form-group"><label>🟢 Maillot vert</label>${riderSelect('greenJerseyAfter', r.greenJerseyAfter)}</div>
-      <div class="form-group"><label>🔴 Maillot à pois</label>${riderSelect('polkaJerseyAfter', r.polkaJerseyAfter)}</div>
-      <div class="form-group"><label>⚪ Maillot blanc</label>${riderSelect('whiteJerseyAfter', r.whiteJerseyAfter)}</div></div>
-    <div class="pred-section"><div class="pred-section-title">📊 Compléments</div>
+      <div class="form-group"><label>Équipe vainqueur</label>${teamSelect('winnerTeam', r.winnerTeam)}</div></div>`;
+    html += `<div class="pred-section"><div class="pred-section-title">📊 Compléments</div>
       <div class="form-group"><label>Échappée ?</label>${boolSelect('winnerFromBreakaway', r.winnerFromBreakaway)}</div>
       <div class="form-group"><label>Écart 1er/2e</label>${rangeSelect('gapRange', r.gapRange, STAGE_GAP_RANGES)}</div>
       <div class="form-group"><label>Plus combatif</label>${riderSelect('mostCombative', r.mostCombative)}</div>
       <div class="form-group"><label>Temps vainqueur</label><input type="time" name="winnerTime" value="${esc(r.winnerTime || '')}"></div></div>`;
-  if (stage.enableLastClimbPrediction) html += `<div class="pred-section"><div class="pred-section-title">⛰️ Sommet</div><div class="form-group"><label>Premier au sommet</label>${riderSelect('lastClimbFirst', r.lastClimbFirst)}</div></div>`;
-  if (stage.enableGreenJerseyChangePrediction) html += `<div class="pred-section"><div class="pred-section-title">🟢 Vert</div><div class="form-group"><label>Vert change ?</label>${boolSelect('greenChanged', r.greenChanged)}</div></div>`;
+    if (stage.enableLastClimbPrediction) html += `<div class="pred-section"><div class="pred-section-title">⛰️ Sommet</div><div class="form-group"><label>Premier au sommet</label>${riderSelect('lastClimbFirst', r.lastClimbFirst)}</div></div>`;
+    if (stage.enableGreenJerseyChangePrediction) html += `<div class="pred-section"><div class="pred-section-title">🟢 Vert</div><div class="form-group"><label>Vert change ?</label>${boolSelect('greenChanged', r.greenChanged)}</div></div>`;
+  }
+  html += `<div class="pred-section"><div class="pred-section-title">🟡 Maillot jaune</div>
+    <div class="form-group"><label>Porteur après</label>${riderSelect('yellowJerseyAfter', r.yellowJerseyAfter)}</div>
+    <div class="form-group"><label>Jaune change ?</label>${boolSelect('yellowChanged', r.yellowChanged)}</div></div>`;
+  html += `<div class="pred-section"><div class="pred-section-title">🎽 Maillots après l'étape <span style="font-weight:400;color:var(--muted)">(info, non noté)</span></div>
+    <div class="form-group"><label>🟢 Maillot vert</label>${riderSelect('greenJerseyAfter', r.greenJerseyAfter)}</div>
+    <div class="form-group"><label>🔴 Maillot à pois</label>${riderSelect('polkaJerseyAfter', r.polkaJerseyAfter)}</div>
+    <div class="form-group"><label>⚪ Maillot blanc</label>${riderSelect('whiteJerseyAfter', r.whiteJerseyAfter)}</div></div>`;
   html += `<button type="submit" class="btn btn-primary">💾 Enregistrer & recalculer</button> ${db.stageResults[id] ? `<button type="button" class="btn btn-danger" onclick="delOrgaStageResult('${id}')">🗑️ Effacer</button>` : ''}</form></div>`;
   area.innerHTML = html;
 }
