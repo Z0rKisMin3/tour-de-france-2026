@@ -504,6 +504,7 @@ function renderShell() {
   if (orgaCode) {
     tabs.push(['registrations', '🛂 Joueurs']);
     tabs.push(['results', '✅ Résultats']);
+    tabs.push(['coverage', '📋 Suivi']);
   }
   document.getElementById('navInner').innerHTML = tabs.map(([id, label]) =>
     `<button class="tab-btn ${id === currentTab ? 'active' : ''}" data-tab="${id}" onclick="showTab('${id}')">${label}</button>`).join('');
@@ -522,7 +523,8 @@ function showTab(tab) {
   const r = {
     dashboard: renderDashboard, pronos: renderPronos,
     ranking: renderRanking, scores: renderScoreDetail, riders: renderRiders, stages: renderStages,
-    chat: renderChat, rules: renderRules, registrations: renderRegistrations, results: renderResults
+    chat: renderChat, rules: renderRules, registrations: renderRegistrations, results: renderResults,
+    coverage: renderCoverage
   }[tab];
   main.innerHTML = '';
   if (r) r(main);
@@ -1263,6 +1265,91 @@ function renderRules(el) {
 }
 
 // ================================================================
+// ONGLET ORGA : SUIVI DES PRONOSTICS
+// ================================================================
+async function renderCoverage(el) {
+  el.innerHTML = '<div class="card"><p style="color:var(--muted)">Chargement du suivi…</p></div>';
+  let data;
+  try {
+    data = await rpc('admin_prediction_status', { p_code: orgaCode });
+  } catch (e) {
+    el.innerHTML = `<div class="alert alert-danger">${esc(e.message)}</div>`; return;
+  }
+
+  const players = db.players.filter(p => p.approved);
+  const stages = db.stages;
+
+  // Build lookup sets
+  const stageDone = new Set((data.stage_preds || []).map(r => r.player_id + '|' + r.stage_id));
+  const pretourDone = new Set((data.pretour_preds || []).map(r => r.player_id));
+
+  const now = Date.now();
+
+  // Count pending per player (only unlocked stages + avant départ)
+  function playerMissing(p) {
+    let m = [];
+    if (!pretourDone.has(p.id)) m.push('Avant départ');
+    stages.forEach(s => {
+      const locked = s.startTime && new Date(s.startTime).getTime() <= now;
+      if (!locked && !stageDone.has(p.id + '|' + s.id)) m.push('É' + s.number);
+    });
+    return m;
+  }
+
+  const cell = (done) => done
+    ? `<td class="cov-cell cov-ok" title="Pronostiqué">✅</td>`
+    : `<td class="cov-cell cov-no" title="Pas encore">○</td>`;
+
+  let rows = players.map(p => {
+    const missing = playerMissing(p);
+    const rowClass = missing.length === 0 ? 'cov-row-ok' : missing.length <= 2 ? 'cov-row-warn' : 'cov-row-bad';
+    const stageCells = stages.map(s => cell(stageDone.has(p.id + '|' + s.id))).join('');
+    const badge = missing.length === 0
+      ? `<span class="badge badge-ok">Complet</span>`
+      : `<span class="badge badge-warn">${missing.length} manquant${missing.length > 1 ? 's' : ''}</span>`;
+    return `<tr class="${rowClass}">
+      <td class="cov-name">${esc(p.name)} ${badge}</td>
+      ${cell(pretourDone.has(p.id))}
+      ${stageCells}
+    </tr>`;
+  }).join('');
+
+  // Summary row
+  const totalPlayers = players.length;
+  const pretourCount = players.filter(p => pretourDone.has(p.id)).length;
+  const stageSummary = stages.map(s => {
+    const n = players.filter(p => stageDone.has(p.id + '|' + s.id)).length;
+    const cls = n === totalPlayers ? 'cov-ok' : n === 0 ? 'cov-no' : 'cov-partial';
+    return `<td class="cov-cell cov-sum ${cls}" title="${n}/${totalPlayers}">${n}</td>`;
+  }).join('');
+
+  el.innerHTML = `
+  <div class="card" style="overflow-x:auto">
+    <div class="card-title" style="margin-bottom:12px">📋 Suivi des pronostics</div>
+    <div class="alert alert-info" style="font-size:12px;margin-bottom:12px">
+      ✅ = pronostiqué · ○ = pas encore · Les étapes verrouillées ne sont pas modifiables de toute façon.
+    </div>
+    <table class="cov-table">
+      <thead>
+        <tr>
+          <th class="cov-name-h">Joueur</th>
+          <th class="cov-stage-h" title="Avant départ">AD</th>
+          ${stages.map(s => `<th class="cov-stage-h" title="Étape ${s.number}">É${s.number}</th>`).join('')}
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+      <tfoot>
+        <tr>
+          <td class="cov-name" style="font-weight:600;color:var(--muted)">Total (/${totalPlayers})</td>
+          <td class="cov-cell cov-sum ${pretourCount === totalPlayers ? 'cov-ok' : 'cov-partial'}">${pretourCount}</td>
+          ${stageSummary}
+        </tr>
+      </tfoot>
+    </table>
+  </div>`;
+}
+
+// ================================================================
 // ONGLET ORGA : INSCRIPTIONS
 // ================================================================
 async function renderRegistrations(el) {
@@ -1679,7 +1766,7 @@ async function init() {
 }
 window.addEventListener('DOMContentLoaded', init);
 
-const APP_VERSION = '24';
+const APP_VERSION = '25';
 async function checkVersion() {
   try {
     const r = await fetch('version.txt?t=' + Date.now());
