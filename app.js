@@ -138,14 +138,14 @@ function riderDisplay(name) {
 
 // selects
 function riderSelect(name, sel, ph = '— Choisir un coureur —', attrs = '') {
-  // Coureurs actifs d'abord (triés par nom), puis abandons en bas
-  const rs = [...db.riders].sort((a, b) => {
-    const ao = a.active === false, bo = b.active === false;
+  // Coureurs partants d'abord, abandons en rouge au bas, non-partants exclus
+  const rs = [...db.riders].filter(r => !r.dns).sort((a, b) => {
+    const ao = !a.active, bo = !b.active;
     if (ao !== bo) return ao ? 1 : -1;
     return byLastName(a, b);
   });
   return `<select name="${esc(name)}" ${attrs}><option value="">${esc(ph)}</option>${rs.map(r => {
-    const out = r.active === false;
+    const out = !r.active;
     const nat = r.nationality ? ' (' + esc(r.nationality) + ')' : '';
     return `<option value="${esc(r.id)}" ${r.id === sel ? 'selected' : ''} ${out ? 'style="color:#E8373A"' : ''}>${out ? '⛔ ' : ''}${esc(riderDisplay(r.name))}${nat}${out ? ' — ABANDON' : ''}</option>`;
   }).join('')}</select>`;
@@ -295,7 +295,7 @@ async function loadAll() {
 
   db.season = seasons.length ? seasons[0] : null;
   db.teams = teams;
-  db.riders = riders.map(r => ({ id: r.id, name: r.name, nationality: r.nationality, teamId: r.team_id, active: r.active !== false }));
+  db.riders = riders.map(r => ({ id: r.id, name: r.name, nationality: r.nationality, teamId: r.team_id, active: r.active !== false, dns: r.dns === true }));
   db.stages = stages.map(s => ({
     id: s.id, number: s.number, date: s.date, startTime: s.start_time, title: s.title,
     type: s.type, coefficient: Number(s.coefficient),
@@ -979,12 +979,14 @@ function renderTeamsTab() {
   if (orgaCode) html += `<div class="inline-form"><div class="inline-form-title">Ajouter une équipe</div><div class="form-row"><div class="form-group"><label>Nom</label><input type="text" id="ntName" maxlength="60"></div><button class="btn btn-primary" onclick="orgaAddTeam()">Ajouter</button></div></div>`;
   const ts = [...db.teams].sort((a, b) => a.name.localeCompare(b.name));
   html += `<div class="alert alert-info" style="margin-bottom:10px">Clique sur une équipe pour voir son effectif (leader ⭐, statut, maillots).</div>`;
-  html += `<div class="card"><table><thead><tr><th>Équipe</th><th>Coureurs</th><th>Abandons</th>${orgaCode ? '<th></th>' : ''}</tr></thead><tbody>`;
+  html += `<div class="card"><table><thead><tr><th>Équipe</th><th>Partants</th><th>Abandons</th><th>Non-partants</th>${orgaCode ? '<th></th>' : ''}</tr></thead><tbody>`;
   ts.forEach(t => {
     const team = db.riders.filter(r => r.teamId === t.id);
-    const n = team.length;
-    const out = team.filter(r => r.active === false).length;
-    html += `<tr style="cursor:pointer" onclick="renderTeamDetail('${t.id}')"><td><strong style="color:var(--yellow)">${esc(t.name)} ›</strong></td><td><span class="badge badge-blue">${n}</span></td><td>${out ? `<span class="badge badge-red">${out}</span>` : '<span style="color:var(--muted)">—</span>'}</td>${orgaCode ? `<td class="td-actions" onclick="event.stopPropagation()">${n === 0 ? `<button class="btn btn-sm btn-danger" onclick="orgaDelTeam('${t.id}')">🗑️</button>` : ''}</td>` : ''}</tr>`;
+    const starters = team.filter(r => !r.dns);
+    const n = starters.filter(r => r.active).length;
+    const out = starters.filter(r => !r.active).length;
+    const dns = team.filter(r => r.dns).length;
+    html += `<tr style="cursor:pointer" onclick="renderTeamDetail('${t.id}')"><td><strong style="color:var(--yellow)">${esc(t.name)} ›</strong></td><td><span class="badge badge-blue">${n}</span></td><td>${out ? `<span class="badge badge-red">${out}</span>` : '<span style="color:var(--muted)">—</span>'}</td><td>${dns ? `<span class="badge badge-warn">${dns}</span>` : '<span style="color:var(--muted)">—</span>'}</td>${orgaCode ? `<td class="td-actions" onclick="event.stopPropagation()">${team.length === 0 ? `<button class="btn btn-sm btn-danger" onclick="orgaDelTeam('${t.id}')">🗑️</button>` : ''}</td>` : ''}</tr>`;
   });
   html += `</tbody></table></div>`;
   sc.innerHTML = html;
@@ -1002,19 +1004,27 @@ function renderTeamDetail(teamId) {
   });
 
   let html = `<button class="btn btn-sm btn-outline" onclick="switchRiderTab('teams')">← Toutes les équipes</button>`;
-  html += `<div class="card" style="margin-top:12px"><div class="card-title">${esc(team.name)} · ${riders.length} coureurs</div>`;
+  const starters = riders.filter(r => !r.dns);
+  const dnsRiders = riders.filter(r => r.dns);
+  html += `<div class="card" style="margin-top:12px"><div class="card-title">${esc(team.name)} · ${starters.length} partants${dnsRiders.length ? ` · ${dnsRiders.length} non-partant${dnsRiders.length > 1 ? 's' : ''}` : ''}</div>`;
   html += `<div style="font-size:11px;color:var(--muted);margin-bottom:10px">Maillots : 🟡 jaune · 🟢 vert · 🔴 à pois · ⚪ blanc · ⭐ leader</div>`;
-  if (!riders.length) html += `<div style="color:var(--muted)">Aucun coureur</div>`;
+  if (!starters.length && !dnsRiders.length) html += `<div style="color:var(--muted)">Aucun coureur</div>`;
   else {
     html += `<table><tbody>`;
-    riders.forEach(r => {
-      const out = r.active === false;
+    starters.forEach(r => {
+      const out = !r.active;
       const isLeader = team.leader_id === r.id;
       html += `<tr style="${out ? 'opacity:.6' : ''}">
         <td>${isLeader ? '⭐ ' : ''}<strong style="${out ? 'color:var(--red)' : ''}">${esc(riderDisplay(r.name))}</strong>${r.nationality ? ` <span style="color:var(--muted);font-size:11px">${esc(r.nationality)}</span>` : ''}${riderJerseyBadges(r.id, j)} ${out ? '<span class="badge badge-red">ABANDON</span>' : '<span class="badge badge-green">actif</span>'}${isLeader ? ' <span class="badge badge-yellow">Leader</span>' : ''}</td>
         ${orgaCode ? `<td class="td-actions">${isLeader ? `<button class="btn btn-sm btn-outline" onclick="orgaSetLeader('${teamId}','')">retirer ⭐</button>` : `<button class="btn btn-sm btn-outline" onclick="orgaSetLeader('${teamId}','${r.id}')">⭐ Leader</button>`} <button class="btn btn-sm btn-outline" onclick="orgaToggleRider('${r.id}',${out},'${teamId}')">${out ? '✅' : '⛔'}</button></td>` : ''}
       </tr>`;
     });
+    if (dnsRiders.length) {
+      html += `<tr><td colspan="2" style="padding-top:10px;font-size:11px;color:var(--muted);font-weight:600">NON-PARTANTS (non sélectionnés)</td></tr>`;
+      dnsRiders.forEach(r => {
+        html += `<tr style="opacity:.45"><td><strong style="color:var(--muted)">${esc(riderDisplay(r.name))}</strong>${r.nationality ? ` <span style="color:var(--muted);font-size:11px">${esc(r.nationality)}</span>` : ''} <span class="badge" style="background:rgba(150,150,150,0.2);color:var(--muted)">DNS</span></td>${orgaCode ? '<td></td>' : ''}</tr>`;
+      });
+    }
     html += `</tbody></table>`;
   }
   html += `</div>`;
@@ -1039,10 +1049,15 @@ function renderRidersTab() {
   const rs = [...db.riders].sort(byLastName);
   html += `<div class="card" style="overflow-x:auto"><table><thead><tr><th>Coureur</th><th>Nat.</th><th>Équipe</th>${orgaCode ? '<th></th>' : ''}</tr></thead><tbody id="ridersTableBody">`;
   rs.forEach(r => {
-    const out = r.active === false;
+    const out = !r.active && !r.dns;
+    const dns = r.dns;
     const teamName = getTeamName(r.teamId);
     const searchKey = (riderDisplay(r.name) + ' ' + (r.nationality || '') + ' ' + teamName).toLowerCase();
-    html += `<tr data-search="${esc(searchKey)}" style="${out ? 'opacity:.65' : ''}"><td><strong style="${out ? 'color:var(--red)' : ''}">${esc(riderDisplay(r.name))}</strong>${out ? ' <span class="badge badge-red">ABANDON</span>' : ''}</td><td style="color:var(--muted)">${esc(r.nationality || '—')}</td><td>${esc(teamName)}</td>${orgaCode ? `<td class="td-actions"><button class="btn btn-sm btn-outline" onclick="orgaToggleRider('${r.id}',${out})">${out ? '✅ Réactiver' : '⛔ HS'}</button> <button class="btn btn-sm btn-danger" onclick="orgaDelRider('${r.id}')">🗑️</button></td>` : ''}</tr>`;
+    const badge = dns ? ' <span class="badge" style="background:rgba(150,150,150,0.2);color:var(--muted)">DNS</span>'
+                : out ? ' <span class="badge badge-red">ABANDON</span>' : '';
+    const rowStyle = dns ? 'opacity:.4' : out ? 'opacity:.65' : '';
+    const nameStyle = dns ? 'color:var(--muted)' : out ? 'color:var(--red)' : '';
+    html += `<tr data-search="${esc(searchKey)}" style="${rowStyle}"><td><strong style="${nameStyle}">${esc(riderDisplay(r.name))}</strong>${badge}</td><td style="color:var(--muted)">${esc(r.nationality || '—')}</td><td>${esc(teamName)}</td>${orgaCode ? `<td class="td-actions">${!dns ? `<button class="btn btn-sm btn-outline" onclick="orgaToggleRider('${r.id}',${out})">${out ? '✅ Réactiver' : '⛔ HS'}</button>` : ''} <button class="btn btn-sm btn-danger" onclick="orgaDelRider('${r.id}')">🗑️</button></td>` : ''}</tr>`;
   });
   html += `</tbody></table></div><div id="riderSearchCount" style="font-size:12px;color:var(--muted);margin-top:6px;text-align:right">${rs.length} coureurs</div>`;
   sc.innerHTML = html;
@@ -1081,7 +1096,7 @@ async function orgaToggleRider(id, currentlyOut, teamId) {
 }
 async function reloadRef() {
   const [teams, riders] = await Promise.all([sbSelect('teams'), sbSelect('riders')]);
-  db.teams = teams; db.riders = riders.map(r => ({ id: r.id, name: r.name, nationality: r.nationality, teamId: r.team_id, active: r.active !== false }));
+  db.teams = teams; db.riders = riders.map(r => ({ id: r.id, name: r.name, nationality: r.nationality, teamId: r.team_id, active: r.active !== false, dns: r.dns === true }));
 }
 
 // ================================================================
@@ -1766,7 +1781,7 @@ async function init() {
 }
 window.addEventListener('DOMContentLoaded', init);
 
-const APP_VERSION = '26';
+const APP_VERSION = '27';
 async function checkVersion() {
   try {
     const r = await fetch('version.txt?t=' + Date.now());
