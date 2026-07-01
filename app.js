@@ -70,7 +70,7 @@ async function rpc(fn, body) {
 // ================================================================
 function esc(s) {
   return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 function showToast(msg, type = '') {
   const t = document.getElementById('toast');
@@ -798,12 +798,12 @@ function renderStageForm() {
       <div class="form-group"><label>Écart 1er/2e <span class="pts-label">5 pts</span></label>${rangeSelect('gapRange', pred.gapRange, STAGE_GAP_RANGES)}</div>
       <div class="form-group"><label>Plus combatif <span class="pts-label">5 pts</span></label>${riderSelect('mostCombative', pred.mostCombative)}</div>
       <div class="form-group"><label>Temps du vainqueur (hh:mm) <span class="pts-label">5 pts</span></label><input type="time" name="winnerTime" value="${esc(pred.winnerTime || '')}"></div></div>`;
-  }
 
-  if (stage.enableLastClimbPrediction)
-    html += `<div class="pred-section"><div class="pred-section-title">⛰️ Dernière ascension</div><div class="form-group"><label>Premier au sommet <span class="pts-label">5 pts</span></label>${riderSelect('lastClimbFirst', pred.lastClimbFirst)}</div></div>`;
-  if (stage.enableGreenJerseyChangePrediction)
-    html += `<div class="pred-section"><div class="pred-section-title">🟢 Maillot vert</div><div class="form-group"><label>Le maillot vert change-t-il ? <span class="pts-label">5 pts</span></label>${boolSelect('greenChanged', pred.greenChanged)}</div></div>`;
+    if (stage.enableLastClimbPrediction)
+      html += `<div class="pred-section"><div class="pred-section-title">⛰️ Dernière ascension</div><div class="form-group"><label>Premier au sommet <span class="pts-label">5 pts</span></label>${riderSelect('lastClimbFirst', pred.lastClimbFirst)}</div></div>`;
+    if (stage.enableGreenJerseyChangePrediction)
+      html += `<div class="pred-section"><div class="pred-section-title">🟢 Maillot vert</div><div class="form-group"><label>Le maillot vert change-t-il ? <span class="pts-label">5 pts</span></label>${boolSelect('greenChanged', pred.greenChanged)}</div></div>`;
+  }
 
   html += `<div style="display:flex;gap:8px;margin-top:8px">`;
   if (!locked) html += `<button type="submit" class="btn btn-primary">💾 Enregistrer</button>`;
@@ -1298,15 +1298,12 @@ async function renderCoverage(el) {
   const stageDone = new Set((data.stage_preds || []).map(r => r.player_id + '|' + r.stage_id));
   const pretourDone = new Set((data.pretour_preds || []).map(r => r.player_id));
 
-  const now = Date.now();
-
   // Count pending per player (only unlocked stages + avant départ)
   function playerMissing(p) {
     let m = [];
-    if (!pretourDone.has(p.id)) m.push('Avant départ');
+    if (!isPreTourLocked() && !pretourDone.has(p.id)) m.push('Avant départ');
     stages.forEach(s => {
-      const locked = s.startTime && new Date(s.startTime).getTime() <= now;
-      if (!locked && !stageDone.has(p.id + '|' + s.id)) m.push('É' + s.number);
+      if (!isStageLocked(s) && !stageDone.has(p.id + '|' + s.id)) m.push('É' + s.number);
     });
     return m;
   }
@@ -1480,7 +1477,14 @@ function renderStageResultForm() {
 }
 async function saveOrgaStageResult(e, id) {
   e.preventDefault(); const f = e.target, fv = n => { const el = f.querySelector(`[name="${n}"]`); return el ? el.value : ''; };
-  const data = { winner: fv('winner'), top3: [fv('top3_0'), fv('top3_1'), fv('top3_2')], finishType: fv('finishType'), winnerTeam: fv('winnerTeam'), yellowJerseyAfter: fv('yellowJerseyAfter'), yellowChanged: fv('yellowChanged'), winnerFromBreakaway: fv('winnerFromBreakaway'), gapRange: fv('gapRange'), mostCombative: fv('mostCombative'), winnerTime: fv('winnerTime'), lastClimbFirst: fv('lastClimbFirst'), greenChanged: fv('greenChanged'), greenJerseyAfter: fv('greenJerseyAfter'), polkaJerseyAfter: fv('polkaJerseyAfter'), whiteJerseyAfter: fv('whiteJerseyAfter') };
+  const stage = db.stages.find(s => s.id === id);
+  let data;
+  if (stage && stage.number === 1) {
+    if (!fv('winnerTeam')) return showToast('Choisis l\'équipe gagnante', 'error');
+    data = { winnerTeam: fv('winnerTeam'), yellowJerseyAfter: fv('yellowJerseyAfter'), yellowChanged: fv('yellowChanged'), greenJerseyAfter: fv('greenJerseyAfter'), polkaJerseyAfter: fv('polkaJerseyAfter'), whiteJerseyAfter: fv('whiteJerseyAfter') };
+  } else {
+    data = { winner: fv('winner'), top3: [fv('top3_0'), fv('top3_1'), fv('top3_2')], finishType: fv('finishType'), winnerTeam: fv('winnerTeam'), yellowJerseyAfter: fv('yellowJerseyAfter'), yellowChanged: fv('yellowChanged'), winnerFromBreakaway: fv('winnerFromBreakaway'), gapRange: fv('gapRange'), mostCombative: fv('mostCombative'), winnerTime: fv('winnerTime'), lastClimbFirst: fv('lastClimbFirst'), greenChanged: fv('greenChanged'), greenJerseyAfter: fv('greenJerseyAfter'), polkaJerseyAfter: fv('polkaJerseyAfter'), whiteJerseyAfter: fv('whiteJerseyAfter') };
+  }
   try { await rpc('admin_set_stage_result', { p_code: orgaCode, p_stage_id: id, p_data: data }); db.stageResults[id] = data; showToast('Résultat enregistré !', 'success'); } catch (err) { showToast(err.message, 'error'); }
 }
 async function delOrgaStageResult(id) {
@@ -1781,7 +1785,7 @@ async function init() {
 }
 window.addEventListener('DOMContentLoaded', init);
 
-const APP_VERSION = '29';
+const APP_VERSION = '30';
 async function checkVersion() {
   try {
     const r = await fetch('version.txt?t=' + Date.now());
