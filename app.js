@@ -349,6 +349,20 @@ async function refreshWhoami() {
 // ================================================================
 const BUG_WA = '32473453924';
 const BUG_EMAIL = 'etienne.depryck@gmail.com';
+const WHATSAPP_GROUP_LINK = 'https://chat.whatsapp.com/LemjUqTAzmhKU7VaQwMJUg?mode=gi_t';
+
+function openWhatsappGroup() {
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(WHATSAPP_GROUP_LINK)}`;
+  showModal(`
+    <div class="card-title" style="margin-bottom:14px">💬 Groupe WhatsApp — Tour de France 2026</div>
+    <div style="text-align:center">
+      <img src="${qrUrl}" alt="QR code groupe WhatsApp" style="width:220px;height:220px;border-radius:12px;background:#fff;padding:8px">
+      <p style="color:var(--muted);font-size:13px;margin-top:12px">Scanne le QR code avec l'appareil photo WhatsApp, ou clique sur le bouton ci-dessous.</p>
+    </div>
+    <a href="${WHATSAPP_GROUP_LINK}" target="_blank" rel="noopener" class="btn btn-primary" style="width:100%;margin-top:8px;display:block;text-align:center;text-decoration:none">📲 Rejoindre le groupe</a>
+    <button class="btn btn-outline" style="width:100%;margin-top:8px" onclick="closeModal()">Fermer</button>
+  `);
+}
 
 function openBugReport() {
   const pseudo = session ? session.name : '';
@@ -478,6 +492,7 @@ function renderShell() {
   // Header
   const ha = document.getElementById('headerActions');
   let h = '';
+  h += `<button class="btn btn-sm btn-outline" onclick="openWhatsappGroup()" title="Rejoindre le groupe WhatsApp">💬 WhatsApp</button>`;
   h += `<button class="btn btn-sm btn-outline" onclick="openBugReport()" title="Signaler un problème">🐛 Bug</button>`;
   if (session) {
     const badge = session.approved ? '' : ' <span class="badge badge-red" style="margin-left:4px">en attente</span>';
@@ -1216,14 +1231,10 @@ function renderStageDetail(stageId) {
 
   // Résultat si dispo
   if (res) {
-    html += `<div class="card"><div class="card-title">✅ Résultat</div>`;
-    if (s.number === 1) {
-      html += `<div class="score-row"><div class="score-field">Équipe gagnante</div><div><strong>${esc(getTeamName(res.winnerTeam))}</strong></div></div>`;
-    } else {
-      html += `<div class="score-row"><div class="score-field">Vainqueur</div><div><strong>${esc(getRiderName(res.winner))}</strong></div></div>
-        ${res.top3 ? `<div class="score-row"><div class="score-field">Top 3</div><div>${(res.top3 || []).map(getRiderName).join(', ')}</div></div>` : ''}`;
-    }
-    html += `${res.yellowJerseyAfter ? `<div class="score-row"><div class="score-field">Maillot jaune</div><div>🟡 ${esc(getRiderName(res.yellowJerseyAfter))}</div></div>` : ''}
+    html += `<div class="card"><div class="card-title">✅ Résultat</div>
+      <div class="score-row"><div class="score-field">Vainqueur</div><div><strong>${esc(getRiderName(res.winner))}</strong></div></div>
+      ${res.top3 ? `<div class="score-row"><div class="score-field">Top 3</div><div>${(res.top3 || []).map(getRiderName).join(', ')}</div></div>` : ''}
+      ${res.yellowJerseyAfter ? `<div class="score-row"><div class="score-field">Maillot jaune</div><div>🟡 ${esc(getRiderName(res.yellowJerseyAfter))}</div></div>` : ''}
     </div>`;
   }
 
@@ -1287,12 +1298,14 @@ async function renderCoverage(el) {
   const stageDone = new Set((data.stage_preds || []).map(r => r.player_id + '|' + r.stage_id));
   const pretourDone = new Set((data.pretour_preds || []).map(r => r.player_id));
 
+  const now = Date.now();
+
   // Count pending per player (only unlocked stages + avant départ)
   function playerMissing(p) {
     let m = [];
     if (!pretourDone.has(p.id)) m.push('Avant départ');
     stages.forEach(s => {
-      const locked = isStageLocked(s);
+      const locked = s.startTime && new Date(s.startTime).getTime() <= now;
       if (!locked && !stageDone.has(p.id + '|' + s.id)) m.push('É' + s.number);
     });
     return m;
@@ -1768,7 +1781,7 @@ async function init() {
 }
 window.addEventListener('DOMContentLoaded', init);
 
-const APP_VERSION = '30';
+const APP_VERSION = '29';
 async function checkVersion() {
   try {
     const r = await fetch('version.txt?t=' + Date.now());
@@ -1782,7 +1795,6 @@ function showUpdateBanner() {
   const el = document.createElement('div');
   el.id = 'updateBanner';
   el.innerHTML = '🔄 Nouvelle version disponible — <strong>Appuie ici pour recharger</strong>';
-  el.style.cssText = 'position:fixed;top:12px;left:50%;transform:translateX(-50%);width:min(520px,calc(100vw - 24px));z-index:9999;text-align:center;';
   el.onclick = () => window.location.reload(true);
   document.body.appendChild(el);
 }
