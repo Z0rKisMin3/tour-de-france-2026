@@ -1768,7 +1768,7 @@ async function init() {
 }
 window.addEventListener('DOMContentLoaded', init);
 
-const APP_VERSION = '29';
+const APP_VERSION = '30';
 async function checkVersion() {
   try {
     const r = await fetch('version.txt?t=' + Date.now());
@@ -1782,6 +1782,7 @@ function showUpdateBanner() {
   const el = document.createElement('div');
   el.id = 'updateBanner';
   el.innerHTML = '🔄 Nouvelle version disponible — <strong>Appuie ici pour recharger</strong>';
+  el.style.cssText = 'position:fixed;top:12px;left:50%;transform:translateX(-50%);width:min(520px,calc(100vw - 24px));z-index:9999;text-align:center;';
   el.onclick = () => window.location.reload(true);
   document.body.appendChild(el);
 }
