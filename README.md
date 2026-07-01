@@ -34,8 +34,8 @@ Cliquer sur **🔑** (en haut à droite) et saisir le code organisateur. Onglets
 ### Avant le départ — 610 pts max
 Vainqueur 100 · Podium 90 (90/60/35/15) · Top 10 100 (10/coureur) · Maillot vert 50 · à pois 50 · blanc 40 · Meilleure équipe 30 · Super combatif 30 · Coureur + victoires 30 · Équipe + victoires 30 · Victoires belges 20 · Abandons 20 · Avance vainqueur 20 (voisine 10).
 
-### Par étape — 110 pts max × coefficient
-Vainqueur 25 · Top 3 20 (20/15/10/5) · Type d'arrivée 10 · Maillot jaune après 10 · Jaune change 5 · Échappée 5 · Écart 1er/2e 5 · Équipe vainqueur 5 · Plus combatif 5 · Garde le jaune 5 · Temps vainqueur 5 · Sommet dernière ascension 5 (si actif) · Maillot vert change 5 (si actif).
+### Par étape — 105 pts max × coefficient
+Vainqueur 25 · Top 3 20 (20/15/10/5) · Type d'arrivée 10 · Maillot jaune après 10 · Jaune change 5 · Échappée 5 · Écart 1er/2e 5 · Équipe vainqueur 5 · Plus combatif 5 · Temps vainqueur 5 · Sommet dernière ascension 5 (si actif) · Maillot vert change 5 (si actif).
 
 **Coefficients :** Plaine ×1,00 · Accidentée ×1,15 · Montagne ×1,35 · Contre-la-montre ×1,25. Arrondi au point entier.
 

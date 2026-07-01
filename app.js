@@ -1216,10 +1216,14 @@ function renderStageDetail(stageId) {
 
   // Résultat si dispo
   if (res) {
-    html += `<div class="card"><div class="card-title">✅ Résultat</div>
-      <div class="score-row"><div class="score-field">Vainqueur</div><div><strong>${esc(getRiderName(res.winner))}</strong></div></div>
-      ${res.top3 ? `<div class="score-row"><div class="score-field">Top 3</div><div>${(res.top3 || []).map(getRiderName).join(', ')}</div></div>` : ''}
-      ${res.yellowJerseyAfter ? `<div class="score-row"><div class="score-field">Maillot jaune</div><div>🟡 ${esc(getRiderName(res.yellowJerseyAfter))}</div></div>` : ''}
+    html += `<div class="card"><div class="card-title">✅ Résultat</div>`;
+    if (s.number === 1) {
+      html += `<div class="score-row"><div class="score-field">Équipe gagnante</div><div><strong>${esc(getTeamName(res.winnerTeam))}</strong></div></div>`;
+    } else {
+      html += `<div class="score-row"><div class="score-field">Vainqueur</div><div><strong>${esc(getRiderName(res.winner))}</strong></div></div>
+        ${res.top3 ? `<div class="score-row"><div class="score-field">Top 3</div><div>${(res.top3 || []).map(getRiderName).join(', ')}</div></div>` : ''}`;
+    }
+    html += `${res.yellowJerseyAfter ? `<div class="score-row"><div class="score-field">Maillot jaune</div><div>🟡 ${esc(getRiderName(res.yellowJerseyAfter))}</div></div>` : ''}
     </div>`;
   }
 
@@ -1283,14 +1287,12 @@ async function renderCoverage(el) {
   const stageDone = new Set((data.stage_preds || []).map(r => r.player_id + '|' + r.stage_id));
   const pretourDone = new Set((data.pretour_preds || []).map(r => r.player_id));
 
-  const now = Date.now();
-
   // Count pending per player (only unlocked stages + avant départ)
   function playerMissing(p) {
     let m = [];
     if (!pretourDone.has(p.id)) m.push('Avant départ');
     stages.forEach(s => {
-      const locked = s.startTime && new Date(s.startTime).getTime() <= now;
+      const locked = isStageLocked(s);
       if (!locked && !stageDone.has(p.id + '|' + s.id)) m.push('É' + s.number);
     });
     return m;
@@ -1766,7 +1768,7 @@ async function init() {
 }
 window.addEventListener('DOMContentLoaded', init);
 
-const APP_VERSION = '28';
+const APP_VERSION = '29';
 async function checkVersion() {
   try {
     const r = await fetch('version.txt?t=' + Date.now());
