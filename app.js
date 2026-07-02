@@ -582,7 +582,7 @@ function renderDashboard(el) {
 
   html += `<div class="grid-2">`;
 
-  html += `<div class="card"><div class="card-title">🏆 Classement général</div>`;
+  html += `<div class="card"><div class="card-title">🏆 Classement général${sorted.length > 10 ? ' <span style="font-weight:400;font-size:12px;color:var(--muted)">(top 10)</span>' : ''}</div>`;
   if (!sorted.length) html += `<div class="empty-state"><p>Aucun joueur inscrit</p></div>`;
   else {
     html += `<table><thead><tr><th>#</th><th>Joueur</th><th style="text-align:right">Points</th></tr></thead><tbody>`;
@@ -591,6 +591,7 @@ function renderDashboard(el) {
       html += `<tr><td class="rank-pos ${medal}">${i + 1}</td><td class="rank-name">${esc(p.name)}${session && p.id === session.id ? ' <span class="badge badge-yellow">moi</span>' : ''}</td><td class="rank-pts">${scores[p.id].total}</td></tr>`;
     });
     html += `</tbody></table>`;
+    if (sorted.length > 10) html += `<div style="text-align:right;margin-top:8px"><a href="#" onclick="showTab('ranking');return false" style="color:var(--yellow);font-size:12px">Voir le classement complet (${sorted.length} joueurs) →</a></div>`;
   }
   html += `</div>`;
 
@@ -1785,7 +1786,7 @@ async function init() {
 }
 window.addEventListener('DOMContentLoaded', init);
 
-const APP_VERSION = '30';
+const APP_VERSION = '31';
 async function checkVersion() {
   try {
     const r = await fetch('version.txt?t=' + Date.now());
