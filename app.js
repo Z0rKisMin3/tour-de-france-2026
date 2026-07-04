@@ -28,7 +28,7 @@ const STAGE_TYPES = {
   montagne:   { label: 'Montagne',         coefficient: 1.35, color: 'type-montagne' },
   clm:        { label: 'Contre-la-montre', coefficient: 1.25, color: 'type-clm' }
 };
-const FINISH_TYPES = ['Sprint', 'Échappée', 'Montagne', 'Contre-la-montre'];
+const FINISH_TYPES = ['Sprint', 'Échappée'];
 
 // ================================================================
 // ÉTAT
@@ -1816,7 +1816,7 @@ async function init() {
 }
 window.addEventListener('DOMContentLoaded', init);
 
-const APP_VERSION = '33';
+const APP_VERSION = '34';
 async function checkVersion() {
   try {
     const r = await fetch('version.txt?t=' + Date.now());
