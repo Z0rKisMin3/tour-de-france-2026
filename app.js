@@ -545,6 +545,13 @@ function showTab(tab) {
   if (r) r(main);
 }
 
+// Ouvre l'onglet Détail des scores préselectionné sur un joueur
+function goScoreDetail(pid) {
+  showTab('scores');
+  const sel = document.getElementById('sdPlayer');
+  if (sel) { sel.value = pid; renderScoreDetailContent(); }
+}
+
 // pending banner helper
 function pendingBanner() {
   if (session && !session.approved) {
@@ -588,9 +595,10 @@ function renderDashboard(el) {
     html += `<table><thead><tr><th>#</th><th>Joueur</th><th style="text-align:right">Points</th></tr></thead><tbody>`;
     sorted.slice(0, 10).forEach((p, i) => {
       const medal = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
-      html += `<tr><td class="rank-pos ${medal}">${i + 1}</td><td class="rank-name">${esc(p.name)}${session && p.id === session.id ? ' <span class="badge badge-yellow">moi</span>' : ''}</td><td class="rank-pts">${scores[p.id].total}</td></tr>`;
+      html += `<tr class="rank-row" onclick="goScoreDetail('${p.id}')" title="Voir le détail des points"><td class="rank-pos ${medal}">${i + 1}</td><td class="rank-name">${esc(p.name)}${session && p.id === session.id ? ' <span class="badge badge-yellow">moi</span>' : ''}</td><td class="rank-pts">${scores[p.id].total}</td></tr>`;
     });
     html += `</tbody></table>`;
+    html += `<p style="font-size:11px;color:var(--muted);margin:8px 0 0">💡 Clique sur un joueur pour voir le détail de ses points.</p>`;
     if (sorted.length > 10) html += `<div style="text-align:right;margin-top:8px"><a href="#" onclick="showTab('ranking');return false" style="color:var(--yellow);font-size:12px">Voir le classement complet (${sorted.length} joueurs) →</a></div>`;
   }
   html += `</div>`;
@@ -874,10 +882,10 @@ function renderRanking(el) {
     const sc = scores[p.id];
     const medal = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
     const me = session && p.id === session.id;
-    html += `<tr style="${me ? 'background:rgba(255,215,0,0.06)' : ''}"><td class="rank-pos ${medal}">${i + 1}</td><td class="rank-name">${esc(p.name)}${me ? ' <span class="badge badge-yellow">moi</span>' : ''}${!p.approved ? ' <span class="badge badge-muted">en attente</span>' : ''}</td><td style="text-align:right;color:var(--muted)">${sc.preTourPts || 0}</td>${stagesDone.map(s => `<td style="text-align:right;color:var(--muted)">${sc.stageBreakdown[s.id] || 0}</td>`).join('')}<td class="rank-pts">${sc.total}</td></tr>`;
+    html += `<tr class="rank-row" onclick="goScoreDetail('${p.id}')" title="Voir le détail des points" style="${me ? 'background:rgba(255,215,0,0.06)' : ''}"><td class="rank-pos ${medal}">${i + 1}</td><td class="rank-name">${esc(p.name)}${me ? ' <span class="badge badge-yellow">moi</span>' : ''}${!p.approved ? ' <span class="badge badge-muted">en attente</span>' : ''}</td><td style="text-align:right;color:var(--muted)">${sc.preTourPts || 0}</td>${stagesDone.map(s => `<td style="text-align:right;color:var(--muted)">${sc.stageBreakdown[s.id] || 0}</td>`).join('')}<td class="rank-pts">${sc.total}</td></tr>`;
   });
   html += `</tbody></table></div>`;
-  html += `<p style="font-size:12px;color:var(--muted);margin-top:8px">En cas d'égalité, les joueurs restent ex æquo (règlement).</p>`;
+  html += `<p style="font-size:12px;color:var(--muted);margin-top:8px">💡 Clique sur un joueur pour voir le détail de ses points. En cas d'égalité, les joueurs restent ex æquo (règlement).</p>`;
   el.innerHTML = html;
 }
 

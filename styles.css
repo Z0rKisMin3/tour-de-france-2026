@@ -316,6 +316,8 @@ tr:hover td { background: rgba(255,255,255,0.03); }
 }
 
 /* RANKING TABLE */
+.rank-row { cursor: pointer; }
+.rank-row:hover { background: rgba(255, 215, 0, 0.10) !important; }
 .rank-pos {
   font-weight: 700;
   font-size: 15px;
@@ -808,17 +810,16 @@ tr:hover td { background: rgba(255,255,255,0.03); }
 .badge-warn { background: rgba(247,127,0,0.2); color: #f77f00; }
 
 #updateBanner {
-  position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
   background: var(--yellow); color: #000;
-  width: min(520px, calc(100vw - 24px));
-  padding: 11px 16px; border-radius: 8px;
+  padding: 11px 20px; border-radius: 10px;
   font-size: 13px; font-weight: 600;
-  text-align: center;
   cursor: pointer; z-index: 9999;
   box-shadow: 0 4px 16px rgba(0,0,0,0.45);
+  white-space: nowrap;
   animation: bannerIn 0.3s ease;
 }
 @keyframes bannerIn {
-  from { opacity: 0; transform: translateX(-50%) translateY(-12px); }
+  from { opacity: 0; transform: translateX(-50%) translateY(12px); }
   to   { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
