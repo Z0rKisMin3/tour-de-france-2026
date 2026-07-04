@@ -1262,11 +1262,24 @@ function renderStageDetail(stageId) {
 
   // Résultat si dispo
   if (res) {
-    html += `<div class="card"><div class="card-title">✅ Résultat</div>
-      <div class="score-row"><div class="score-field">Vainqueur</div><div><strong>${esc(getRiderName(res.winner))}</strong></div></div>
-      ${res.top3 ? `<div class="score-row"><div class="score-field">Top 3</div><div>${(res.top3 || []).map(getRiderName).join(', ')}</div></div>` : ''}
-      ${res.yellowJerseyAfter ? `<div class="score-row"><div class="score-field">Maillot jaune</div><div>🟡 ${esc(getRiderName(res.yellowJerseyAfter))}</div></div>` : ''}
-    </div>`;
+    html += `<div class="card"><div class="card-title">✅ Résultat</div>`;
+    if (s.number === 1) {
+      html += `<div class="score-row"><div class="score-field">Équipe gagnante</div><div><strong>${esc(getTeamName(res.winnerTeam))}</strong></div></div>`;
+    } else {
+      html += `<div class="score-row"><div class="score-field">Vainqueur</div><div><strong>${esc(getRiderName(res.winner))}</strong></div></div>`;
+      if (res.top3) html += `<div class="score-row"><div class="score-field">Top 3</div><div>${(res.top3 || []).map(getRiderName).join(', ')}</div></div>`;
+    }
+    html += `<div style="font-size:12px;color:var(--muted);margin:10px 0 4px">🎽 Maillots à l'issue de l'étape</div>`;
+    const JERSEY_ROWS = [
+      ['yellowJerseyAfter', '🟡', 'Maillot jaune'],
+      ['greenJerseyAfter', '🟢', 'Maillot vert'],
+      ['polkaJerseyAfter', '🔴', 'Maillot à pois'],
+      ['whiteJerseyAfter', '⚪', 'Maillot blanc']
+    ];
+    JERSEY_ROWS.forEach(([key, icon, label]) => {
+      html += `<div class="score-row"><div class="score-field">${label}</div><div>${res[key] ? `${icon} ${esc(getRiderName(res[key]))}` : '<span style="color:var(--muted)">non attribué</span>'}</div></div>`;
+    });
+    html += `</div>`;
   }
 
   el.innerHTML = html;
@@ -1816,7 +1829,7 @@ async function init() {
 }
 window.addEventListener('DOMContentLoaded', init);
 
-const APP_VERSION = '35';
+const APP_VERSION = '36';
 async function checkVersion() {
   try {
     const r = await fetch('version.txt?t=' + Date.now());
