@@ -587,6 +587,28 @@ function renderDashboard(el) {
 
   html += `<div class="alert ${ptLocked ? 'alert-danger' : 'alert-success'}">${ptLocked ? '🔒 Pronostics avant départ <strong>verrouillés</strong> — le Tour a commencé' : '🟢 Pronostics avant départ <strong>ouverts</strong> jusqu\'au départ de l\'étape 1'}</div>`;
 
+  // Maillots actuels (d'après la dernière étape encodée)
+  const j = currentJerseys();
+  const lastDone = done.length ? done[0] : null;
+  const JERSEYS = [
+    ['yellow', '🟡', 'Maillot jaune', 'Leader du classement général'],
+    ['green', '🟢', 'Maillot vert', 'Classement par points'],
+    ['polka', '🔴', 'Maillot à pois', 'Meilleur grimpeur'],
+    ['white', '⚪', 'Maillot blanc', 'Meilleur jeune']
+  ];
+  html += `<div class="card"><div class="card-title">🎽 Les maillots${lastDone ? ` <span style="font-weight:400;font-size:12px;color:var(--muted)">(après l'étape ${lastDone.number})</span>` : ''}</div>`;
+  if (!lastDone) html += `<div style="color:var(--muted);font-size:13px">Les porteurs s'afficheront dès la première étape courue.</div>`;
+  else {
+    html += `<table><tbody>`;
+    JERSEYS.forEach(([key, icon, label, sub]) => {
+      const rid = j[key];
+      const rider = rid ? db.riders.find(r => r.id === rid) : null;
+      html += `<tr><td style="width:30px;font-size:18px">${icon}</td><td><strong>${rider ? esc(riderDisplay(rider.name)) : '<span style="color:var(--muted)">non attribué</span>'}</strong>${rider && rider.teamId ? ` <span style="color:var(--muted);font-size:11px">${esc(getTeamName(rider.teamId))}</span>` : ''}<div style="font-size:11px;color:var(--muted)">${label} · ${sub}</div></td></tr>`;
+    });
+    html += `</tbody></table>`;
+  }
+  html += `</div>`;
+
   html += `<div class="grid-2">`;
 
   html += `<div class="card"><div class="card-title">🏆 Classement général${sorted.length > 10 ? ' <span style="font-weight:400;font-size:12px;color:var(--muted)">(top 10)</span>' : ''}</div>`;
@@ -1794,7 +1816,7 @@ async function init() {
 }
 window.addEventListener('DOMContentLoaded', init);
 
-const APP_VERSION = '31';
+const APP_VERSION = '32';
 async function checkVersion() {
   try {
     const r = await fetch('version.txt?t=' + Date.now());
