@@ -1816,7 +1816,7 @@ async function init() {
 }
 window.addEventListener('DOMContentLoaded', init);
 
-const APP_VERSION = '32';
+const APP_VERSION = '33';
 async function checkVersion() {
   try {
     const r = await fetch('version.txt?t=' + Date.now());
