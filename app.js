@@ -246,7 +246,13 @@ function calculateStageRawScore(pred, res, stage) {
   const d = {};
   d.winner = eq(pred.stageWinner, res.winner) ? 25 : 0;
   d.top3 = getStageTop3Score(pred.stageTop3, res.top3);
-  if (stage.type !== 'clm') d.finishType = eq(pred.finishType, res.finishType) ? 10 : 0;
+  if (stage.type !== 'clm') {
+    // "Montagne" est aussi accepté : toujours sur les étapes de type montagne,
+    // et sur les étapes dont le résultat porte finishTypeAlt (ex. arrivée en côte)
+    const okFinish = eq(pred.finishType, res.finishType)
+      || (pred.finishType === 'Montagne' && (stage.type === 'montagne' || res.finishTypeAlt === 'Montagne'));
+    d.finishType = okFinish ? 10 : 0;
+  }
   d.yellowJersey = eq(pred.yellowJerseyAfter, res.yellowJerseyAfter) ? 10 : 0;
   d.yellowChanged = eq(pred.yellowChanged, res.yellowChanged) ? 5 : 0;
   d.fromBreakaway = eq(pred.winnerFromBreakaway, res.winnerFromBreakaway) ? 5 : 0;
@@ -985,7 +991,11 @@ function renderScoreDetailContent() {
           ['mostCombative', 'Plus combatif', 5, getRiderName(sp.mostCombative), getRiderName(srr.mostCombative)],
           ['winnerTime', 'Temps vainqueur', 5, sp.winnerTime, srr.winnerTime]
         ];
-        if (stage.type !== 'clm') F.splice(2, 0, ['finishType', "Type d'arrivée", 10, sp.finishType, srr.finishType]);
+        if (stage.type !== 'clm') {
+          const montAccepted = stage.type === 'montagne' || srr.finishTypeAlt === 'Montagne';
+          const offFinish = srr.finishType + (montAccepted && srr.finishType !== 'Montagne' ? ' (ou Montagne)' : '');
+          F.splice(2, 0, ['finishType', "Type d'arrivée", 10, sp.finishType, offFinish]);
+        }
         if (stage.enableLastClimbPrediction) F.push(['lastClimb', 'Sommet dernière ascension', 5, getRiderName(sp.lastClimbFirst), getRiderName(srr.lastClimbFirst)]);
         if (stage.enableGreenJerseyChangePrediction) F.push(['greenChanged', 'Vert change ?', 5, sp.greenChanged, srr.greenChanged]);
       }
@@ -1319,6 +1329,7 @@ function renderRules(el) {
   <div class="card"><div class="card-title">Barème par étape — 105 pts max × coefficient</div><table><tbody>
     <tr><td>Vainqueur</td><td class="rank-pts">25</td></tr><tr><td>Top 3 (20/15/10/5)</td><td class="rank-pts">20</td></tr><tr><td>Type d'arrivée <span style="color:var(--muted)">(sauf contre-la-montre)</span></td><td class="rank-pts">10</td></tr><tr><td>Maillot jaune après l'étape</td><td class="rank-pts">10</td></tr><tr><td>Maillot jaune change ?</td><td class="rank-pts">5</td></tr><tr><td>Vainqueur de l'échappée ?</td><td class="rank-pts">5</td></tr><tr><td>Écart 1er/2e</td><td class="rank-pts">5</td></tr><tr><td>Équipe du vainqueur</td><td class="rank-pts">5</td></tr><tr><td>Plus combatif</td><td class="rank-pts">5</td></tr><tr><td>Temps du vainqueur</td><td class="rank-pts">5</td></tr><tr><td>⛰️ Sommet dernière ascension (si actif)</td><td class="rank-pts">5</td></tr><tr><td>🟢 Maillot vert change (si actif)</td><td class="rank-pts">5</td></tr>
   </tbody></table></div>
+  <div class="card"><div class="card-title">Type d'arrivée — règle « Montagne »</div><p style="font-size:13px">Sur les étapes de <strong>montagne</strong> (et les arrivées jugées en côte par l'organisateur), le pronostic « Montagne » est accepté comme réponse valable en plus du scénario officiel (Sprint/Échappée). Les deux réponses rapportent les 10 points.</p></div>
   <div class="card"><div class="card-title">Coefficients</div><table><tbody><tr><td class="type-plaine">Plaine</td><td>×1,00</td></tr><tr><td class="type-accidentee">Accidentée</td><td>×1,15</td></tr><tr><td class="type-montagne">Montagne</td><td>×1,35</td></tr><tr><td class="type-clm">Contre-la-montre</td><td>×1,25</td></tr></tbody></table><p style="margin-top:8px;font-size:12px;color:var(--muted)">Appliqué au total de l'étape, arrondi au point entier.</p></div>
   <div class="card"><div class="card-title">Égalités</div><p>Les joueurs à égalité restent ex æquo. Le bonus coup de poker n'est pas activé dans cette version.</p></div>`;
 }
@@ -1829,7 +1840,7 @@ async function init() {
 }
 window.addEventListener('DOMContentLoaded', init);
 
-const APP_VERSION = '36';
+const APP_VERSION = '37';
 async function checkVersion() {
   try {
     const r = await fetch('version.txt?t=' + Date.now());
