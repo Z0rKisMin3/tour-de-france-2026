@@ -973,38 +973,42 @@ function renderScoreDetailContent() {
     const ti = STAGE_TYPES[stage.type] || STAGE_TYPES.plaine;
     html += `<div class="card"><div class="card-title">Étape ${stage.number} — ${esc(stage.title)} · ${pts} pts <span style="font-weight:400;font-size:11px">(×${ti.coefficient.toFixed(2)})</span></div>`;
     if (!sp) html += `<div style="color:var(--muted)">${isStageLocked(stage) ? 'Aucun pronostic' : 'Non visible (étape pas encore courue)'}</div>`;
-    else if (!srr) html += `<div style="color:var(--muted)">En attente du résultat officiel</div>`;
     else {
-      const { raw, detail } = calculateStageRawScore(sp, srr, stage);
+      const hasRes = !!srr;
+      const { raw, detail } = hasRes ? calculateStageRawScore(sp, srr, stage) : { raw: 0, detail: {} };
+      const off = (fn) => hasRes ? fn() : '—';
       let F;
       if (stage.number === 1) {
-        F = [['winner', 'Équipe gagnante (CLM équipes)', 25, getTeamName(sp.teamWinner), getTeamName(srr.winnerTeam)]];
+        F = [['winner', 'Équipe gagnante (CLM équipes)', 25, getTeamName(sp.teamWinner), off(() => getTeamName(srr.winnerTeam))]];
       } else {
         F = [
-          ['winner', 'Vainqueur', 25, getRiderName(sp.stageWinner), getRiderName(srr.winner)],
-          ['top3', 'Top 3', 20, (sp.stageTop3 || []).map(getRiderName).join(', '), (srr.top3 || []).map(getRiderName).join(', ')],
-          ['yellowJersey', 'Maillot jaune après', 10, getRiderName(sp.yellowJerseyAfter), getRiderName(srr.yellowJerseyAfter)],
-          ['yellowChanged', 'Jaune change ?', 5, sp.yellowChanged, srr.yellowChanged],
-          ['fromBreakaway', 'Échappée ?', 5, sp.winnerFromBreakaway, srr.winnerFromBreakaway],
-          ['gapRange', 'Écart 1er/2e', 5, sp.gapRange, srr.gapRange],
-          ['winnerTeam', 'Équipe vainqueur', 5, getTeamName(sp.winnerTeam), getTeamName(srr.winnerTeam)],
-          ['mostCombative', 'Plus combatif', 5, getRiderName(sp.mostCombative), getRiderName(srr.mostCombative)],
-          ['winnerTime', 'Temps vainqueur', 5, sp.winnerTime, srr.winnerTime]
+          ['winner', 'Vainqueur', 25, getRiderName(sp.stageWinner), off(() => getRiderName(srr.winner))],
+          ['top3', 'Top 3', 20, (sp.stageTop3 || []).map(getRiderName).join(', '), off(() => (srr.top3 || []).map(getRiderName).join(', '))],
+          ['yellowJersey', 'Maillot jaune après', 10, getRiderName(sp.yellowJerseyAfter), off(() => getRiderName(srr.yellowJerseyAfter))],
+          ['yellowChanged', 'Jaune change ?', 5, sp.yellowChanged, off(() => srr.yellowChanged)],
+          ['fromBreakaway', 'Échappée ?', 5, sp.winnerFromBreakaway, off(() => srr.winnerFromBreakaway)],
+          ['gapRange', 'Écart 1er/2e', 5, sp.gapRange, off(() => srr.gapRange)],
+          ['winnerTeam', 'Équipe vainqueur', 5, getTeamName(sp.winnerTeam), off(() => getTeamName(srr.winnerTeam))],
+          ['mostCombative', 'Plus combatif', 5, getRiderName(sp.mostCombative), off(() => getRiderName(srr.mostCombative))],
+          ['winnerTime', 'Temps vainqueur', 5, sp.winnerTime, off(() => srr.winnerTime)]
         ];
         if (stage.type !== 'clm') {
-          const montAccepted = stage.type === 'montagne' || srr.finishTypeAlt === 'Montagne';
-          const offFinish = srr.finishType + (montAccepted && srr.finishType !== 'Montagne' ? ' (ou Montagne)' : '');
+          const offFinish = off(() => {
+            const montAccepted = stage.type === 'montagne' || srr.finishTypeAlt === 'Montagne';
+            return srr.finishType + (montAccepted && srr.finishType !== 'Montagne' ? ' (ou Montagne)' : '');
+          });
           F.splice(2, 0, ['finishType', "Type d'arrivée", 10, sp.finishType, offFinish]);
         }
-        if (stage.enableLastClimbPrediction) F.push(['lastClimb', 'Sommet dernière ascension', 5, getRiderName(sp.lastClimbFirst), getRiderName(srr.lastClimbFirst)]);
-        if (stage.enableGreenJerseyChangePrediction) F.push(['greenChanged', 'Vert change ?', 5, sp.greenChanged, srr.greenChanged]);
+        if (stage.enableLastClimbPrediction) F.push(['lastClimb', 'Sommet dernière ascension', 5, getRiderName(sp.lastClimbFirst), off(() => getRiderName(srr.lastClimbFirst))]);
+        if (stage.enableGreenJerseyChangePrediction) F.push(['greenChanged', 'Vert change ?', 5, sp.greenChanged, off(() => srr.greenChanged)]);
       }
+      if (!hasRes) html += `<div style="font-size:12px;color:var(--muted);margin-bottom:8px">🔒 Pronostic verrouillé et visible — points calculés dès que le résultat officiel est encodé.</div>`;
       F.forEach(([k, label, max, pv, rv]) => {
-        const p = detail[k] != null ? detail[k] : null;
+        const p = hasRes && detail[k] != null ? detail[k] : null;
         const cls = p == null ? '' : p === max ? 'perfect' : p > 0 ? '' : 'zero';
         html += scoreRow(label, pv, rv, p, max, cls);
       });
-      html += `<div style="border-top:1px solid var(--border);padding-top:8px;margin-top:4px;text-align:right">Brut ${raw} × ${ti.coefficient.toFixed(2)} = <strong style="color:var(--yellow)">${pts} pts</strong></div>`;
+      if (hasRes) html += `<div style="border-top:1px solid var(--border);padding-top:8px;margin-top:4px;text-align:right">Brut ${raw} × ${ti.coefficient.toFixed(2)} = <strong style="color:var(--yellow)">${pts} pts</strong></div>`;
     }
     html += `</div>`;
   }
@@ -1840,7 +1844,7 @@ async function init() {
 }
 window.addEventListener('DOMContentLoaded', init);
 
-const APP_VERSION = '37';
+const APP_VERSION = '38';
 async function checkVersion() {
   try {
     const r = await fetch('version.txt?t=' + Date.now());
