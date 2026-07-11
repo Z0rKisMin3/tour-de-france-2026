@@ -966,7 +966,14 @@ function renderScoreDetailContent() {
   }
   html += `</div>`;
 
-  for (const stage of db.stages) {
+  // Ordre d'affichage : étapes courues/en cours d'abord (de la plus récente à
+  // la plus ancienne), puis les étapes pas encore courues (dans l'ordre à venir).
+  const orderedStages = [...db.stages].sort((a, b) => {
+    const la = isStageLocked(a), lb = isStageLocked(b);
+    if (la !== lb) return la ? -1 : 1;
+    return la ? b.number - a.number : a.number - b.number;
+  });
+  for (const stage of orderedStages) {
     const sp = db.stagePredictions[pid + '_' + stage.id];
     const srr = db.stageResults[stage.id];
     const pts = sc.stageBreakdown[stage.id] || 0;
@@ -1844,7 +1851,7 @@ async function init() {
 }
 window.addEventListener('DOMContentLoaded', init);
 
-const APP_VERSION = '38';
+const APP_VERSION = '39';
 async function checkVersion() {
   try {
     const r = await fetch('version.txt?t=' + Date.now());
