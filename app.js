@@ -577,6 +577,11 @@ function renderDashboard(el) {
   const ptLocked = isPreTourLocked();
 
   let html = pendingBanner();
+  // Bandeau de fin de Tour : rappelle le vainqueur et permet de rejouer l'animation
+  if (tourIsFinished()) {
+    const cd = celebrationData();
+    if (cd) html += `<div class="celeb-banner" onclick="showCelebration()" title="Revoir la célébration">🏆 <strong class="gold-text">${esc(cd.champions.names.join(' & '))}</strong> remporte les pronostics du Tour 2026 ! <span>Revoir la célébration ✨</span></div>`;
+  }
   if (!session) html += `<div class="alert alert-info">👋 Bienvenue ! <a href="#" onclick="openAuth('register');return false" style="color:var(--yellow)">Crée un compte</a> ou <a href="#" onclick="openAuth('login');return false" style="color:var(--yellow)">connecte-toi</a> pour pronostiquer. Tu peux consulter le classement et le parcours librement.</div>`;
 
   const sz = db.season || {};
@@ -606,10 +611,13 @@ function renderDashboard(el) {
   if (!lastDone) html += `<div style="color:var(--muted);font-size:13px">Les porteurs s'afficheront dès la première étape courue.</div>`;
   else {
     html += `<table><tbody>`;
+    const finished = tourIsFinished();
     JERSEYS.forEach(([key, icon, label, sub]) => {
       const rid = j[key];
       const rider = rid ? db.riders.find(r => r.id === rid) : null;
-      html += `<tr><td style="width:30px;font-size:18px">${icon}</td><td><strong>${rider ? esc(riderDisplay(rider.name)) : '<span style="color:var(--muted)">non attribué</span>'}</strong>${rider && rider.teamId ? ` <span style="color:var(--muted);font-size:11px">${esc(getTeamName(rider.teamId))}</span>` : ''}<div style="font-size:11px;color:var(--muted)">${label} · ${sub}</div></td></tr>`;
+      // À Paris, le maillot jaune final est mis en or
+      const gold = finished && key === 'yellow' && rider ? ' class="gold-text"' : '';
+      html += `<tr><td style="width:30px;font-size:18px">${icon}</td><td><strong${gold}>${rider ? esc(riderDisplay(rider.name)) : '<span style="color:var(--muted)">non attribué</span>'}</strong>${rider && rider.teamId ? ` <span style="color:var(--muted);font-size:11px">${esc(getTeamName(rider.teamId))}</span>` : ''}<div style="font-size:11px;color:var(--muted)">${label} · ${sub}${finished && key === 'yellow' ? ' · <strong style="color:var(--yellow)">Vainqueur du Tour</strong>' : ''}</div></td></tr>`;
     });
     html += `</tbody></table>`;
   }
@@ -1812,6 +1820,160 @@ function insertMention(name) {
 }
 
 // ================================================================
+// 🏆 CÉLÉBRATION DE FIN DE TOUR — effet visuel uniquement
+// ================================================================
+// Ne fait que LIRE le classement déjà calculé et les résultats déjà encodés.
+// Aucune écriture en base, aucun impact sur les pronostics ni sur le scoring.
+
+const LS_CELEB = 'tdf2026_celebrated';
+let celebRaf = null;
+
+// Le Tour est fini quand le résultat de la 21e étape est encodé.
+function tourIsFinished() {
+  const last = db.stages.find(s => s.number === 21);
+  return !!(last && db.stageResults[last.id]);
+}
+
+// Classement final regroupé par score (gère les ex æquo du règlement)
+function celebrationData() {
+  if (!db.players.length) return null;
+  const scores = {};
+  db.players.forEach(p => { scores[p.id] = calculatePlayerTotal(p.id).total; });
+  const ranked = [...db.players].sort((a, b) => scores[b.id] - scores[a.id]);
+  const groups = []; let rank = 1;
+  [...new Set(ranked.map(p => scores[p.id]))].forEach(sc => {
+    const members = ranked.filter(p => scores[p.id] === sc);
+    groups.push({ rank, names: members.map(p => p.name), pts: sc });
+    rank += members.length;
+  });
+  // Vainqueur du Tour : classement final si encodé, sinon porteur du jaune à Paris
+  const last = db.stages.find(s => s.number === 21);
+  const lastRes = last ? db.stageResults[last.id] : null;
+  const tdfId = (db.pretourResults && db.pretourResults.winner) || (lastRes && lastRes.yellowJerseyAfter);
+  return { champions: groups[0], others: groups.slice(1, 3), tdfWinner: tdfId ? getRiderName(tdfId) : null };
+}
+
+const CELEB_TROPHY = `<svg class="celeb-trophy" viewBox="0 0 100 96" width="104" height="100" aria-hidden="true">
+  <defs><linearGradient id="celebGold" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#FFF6C2"/><stop offset="38%" stop-color="#FFD700"/>
+    <stop offset="72%" stop-color="#D69B00"/><stop offset="100%" stop-color="#FFE58A"/>
+  </linearGradient></defs>
+  <path d="M30 20 H16 a13 13 0 0 0 13 21" fill="none" stroke="url(#celebGold)" stroke-width="6" stroke-linecap="round"/>
+  <path d="M70 20 H84 a13 13 0 0 1 -13 21" fill="none" stroke="url(#celebGold)" stroke-width="6" stroke-linecap="round"/>
+  <path d="M29 12 h42 v24 a21 21 0 0 1 -42 0 z" fill="url(#celebGold)"/>
+  <rect x="46" y="57" width="8" height="15" fill="url(#celebGold)"/>
+  <rect x="35" y="72" width="30" height="7" rx="2" fill="url(#celebGold)"/>
+  <rect x="28" y="79" width="44" height="10" rx="3" fill="url(#celebGold)"/>
+</svg>`;
+
+function showCelebration() {
+  if (document.getElementById('celebOverlay')) return;
+  const d = celebrationData();
+  if (!d) return;
+  const tie = d.champions.names.length > 1;
+  const others = d.others.map(g => `<div>${g.rank}. ${g.names.map(esc).join(' & ')} · ${g.pts} pts</div>`).join('');
+  const ov = document.createElement('div');
+  ov.id = 'celebOverlay';
+  ov.innerHTML = `<canvas id="celebCanvas"></canvas>
+    <div class="celeb-box">
+      <div class="celeb-kicker">Tour de France 2026 · Classement final</div>
+      ${CELEB_TROPHY}
+      <div class="celeb-label">${tie ? 'Vainqueurs des pronostics' : 'Vainqueur des pronostics'}</div>
+      <div class="celeb-name">${d.champions.names.map(esc).join(' & ')}</div>
+      <div class="celeb-pts">${d.champions.pts} points</div>
+      ${others ? `<div class="celeb-rest">${others}</div>` : ''}
+      ${d.tdfWinner ? `<div class="celeb-tdf">🚴 Vainqueur du Tour de France 2026<span class="gold-text">${esc(d.tdfWinner)}</span></div>` : ''}
+      <button class="btn btn-outline celeb-close" onclick="closeCelebration()">Fermer</button>
+    </div>`;
+  document.body.appendChild(ov);
+  requestAnimationFrame(() => ov.classList.add('show'));
+  startFireworks(document.getElementById('celebCanvas'));
+}
+
+function closeCelebration() {
+  if (celebRaf) { cancelAnimationFrame(celebRaf); celebRaf = null; }
+  const ov = document.getElementById('celebOverlay');
+  if (!ov) return;
+  const c = document.getElementById('celebCanvas');
+  if (c && c._onResize) window.removeEventListener('resize', c._onResize);
+  ov.classList.remove('show');
+  setTimeout(() => ov.remove(), 320);
+}
+
+function startFireworks(canvas) {
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  let W = 0, H = 0;
+  const resize = () => { W = canvas.width = canvas.clientWidth * dpr; H = canvas.height = canvas.clientHeight * dpr; };
+  resize();
+  canvas._onResize = resize;
+  window.addEventListener('resize', resize);
+  // Respecte le réglage système « animations réduites » : overlay statique
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+  const COLORS = ['#FFD700', '#FFB300', '#FF5252', '#40C4FF', '#69F0AE', '#FF80D5', '#FFFFFF', '#B388FF'];
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  const pick = () => COLORS[(Math.random() * COLORS.length) | 0];
+  const rockets = [], sparks = [];
+
+  function launch() {
+    rockets.push({ x: rnd(W * 0.12, W * 0.88), y: H, vy: -rnd(H * 0.011, H * 0.016), target: rnd(H * 0.12, H * 0.46), color: pick() });
+  }
+  function burst(x, y, color) {
+    const n = 70 + ((Math.random() * 45) | 0);
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2, sp = rnd(0.5, 5) * dpr;
+      sparks.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 1, decay: rnd(0.008, 0.02), color, r: rnd(1.1, 2.5) * dpr });
+    }
+  }
+
+  let t = 0;
+  function frame() {
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = 'rgba(0,0,0,0.2)';
+    ctx.fillRect(0, 0, W, H);
+    ctx.globalCompositeOperation = 'lighter';
+
+    if (t % 26 === 0) launch();
+    if (t % 26 === 13 && Math.random() < 0.5) launch();
+    t++;
+
+    for (let i = rockets.length - 1; i >= 0; i--) {
+      const r = rockets[i];
+      r.y += r.vy; r.vy += 0.06 * dpr;
+      ctx.beginPath(); ctx.fillStyle = r.color;
+      ctx.arc(r.x, r.y, 2.2 * dpr, 0, Math.PI * 2); ctx.fill();
+      if (r.vy >= 0 || r.y <= r.target) { burst(r.x, r.y, r.color); rockets.splice(i, 1); }
+    }
+    for (let i = sparks.length - 1; i >= 0; i--) {
+      const s = sparks[i];
+      s.x += s.vx; s.y += s.vy; s.vy += 0.045 * dpr; s.vx *= 0.99; s.vy *= 0.99;
+      s.life -= s.decay;
+      if (s.life <= 0) { sparks.splice(i, 1); continue; }
+      ctx.globalAlpha = Math.max(s.life, 0);
+      ctx.beginPath(); ctx.fillStyle = s.color;
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    celebRaf = requestAnimationFrame(frame);
+  }
+  burst(W * 0.3, H * 0.32, '#FFD700');
+  burst(W * 0.7, H * 0.36, '#40C4FF');
+  celebRaf = requestAnimationFrame(frame);
+}
+
+// Déclenchement auto à l'ouverture de l'app : une fois par session de navigation
+function maybeCelebrate() {
+  if (!tourIsFinished()) return;
+  try {
+    if (sessionStorage.getItem(LS_CELEB)) return;
+    sessionStorage.setItem(LS_CELEB, '1');
+  } catch { /* mode privé : on célèbre quand même */ }
+  setTimeout(showCelebration, 700);
+}
+
+// ================================================================
 // INIT
 // ================================================================
 async function init() {
@@ -1846,12 +2008,15 @@ async function init() {
     switchResultTab, renderStageResultForm, saveOrgaPreResult, saveOrgaStageResult, delOrgaStageResult,
     orgaApprove, orgaRevoke, orgaReject, orgaResetPass,
     submitChat, chatToggleReaction, openChatEmojiPicker, chatReply, cancelChatReply, chatDelete,
-    onChatInput, onChatKey, insertMention
+    onChatInput, onChatKey, insertMention,
+    showCelebration, closeCelebration
   });
+
+  maybeCelebrate();
 }
 window.addEventListener('DOMContentLoaded', init);
 
-const APP_VERSION = '39';
+const APP_VERSION = '40';
 async function checkVersion() {
   try {
     const r = await fetch('version.txt?t=' + Date.now());
