@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Verrou réseau : aucune requête sortante possible (fetch, XHR, images, polices, formulaires…). -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'none'; font-src 'none'; form-action 'none'; base-uri 'none'; object-src 'none'; frame-src 'none'; worker-src 'none'; manifest-src 'none'; media-src 'none'">
+  <meta name="referrer" content="no-referrer">
+  <title>Analyse de documents</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">▤</span>
+      <div>
+        <h1>Analyse de documents</h1>
+        <p class="tagline">Transforme un document en synthèse structurée et lisible.</p>
+      </div>
+    </div>
+    <span class="badge-local" title="Une politique de sécurité bloque toute connexion réseau depuis cette page.">
+      <span class="dot" aria-hidden="true"></span> 100 % local — aucune donnée transmise
+    </span>
+  </header>
+
+  <main class="layout">
+    <section class="card input-card" aria-labelledby="input-title">
+      <h2 id="input-title">1. Document à analyser</h2>
+
+      <label id="dropzone" class="dropzone" tabindex="0">
+        <input id="file-input" type="file" accept=".txt,.md,.markdown,.html,.htm,.docx,.odt,.csv,.log,.json,.xml,text/*">
+        <span class="dz-icon" aria-hidden="true">⇪</span>
+        <span class="dz-main">Déposez un fichier ici ou <u>cliquez pour choisir</u></span>
+        <span class="dz-sub">Formats : .docx, .odt, .txt, .md, .html — le fichier est lu dans le navigateur, jamais envoyé.</span>
+      </label>
+
+      <div class="or"><span>ou</span></div>
+
+      <label for="text-input" class="label">Coller un texte</label>
+      <textarea id="text-input" rows="8" placeholder="Collez ici le contenu du document…" spellcheck="false"></textarea>
+
+      <div class="options">
+        <label class="label" for="summary-length">Longueur de la synthèse</label>
+        <select id="summary-length">
+          <option value="short">Courte</option>
+          <option value="medium" selected>Moyenne</option>
+          <option value="long">Détaillée</option>
+        </select>
+        <label class="check"><input id="opt-section-summaries" type="checkbox" checked> Résumé par section</label>
+      </div>
+
+      <div class="actions">
+        <button id="btn-analyze" class="btn primary" type="button">Analyser</button>
+        <button id="btn-clear" class="btn ghost" type="button">Tout effacer</button>
+      </div>
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="card output-card" aria-labelledby="output-title">
+      <div class="output-head">
+        <h2 id="output-title">2. Document structuré</h2>
+        <div class="toolbar">
+          <button id="btn-export-html" class="btn" type="button" disabled>Exporter HTML</button>
+          <button id="btn-export-md" class="btn" type="button" disabled>Exporter Markdown</button>
+          <button id="btn-print" class="btn" type="button" disabled>Imprimer / PDF</button>
+        </div>
+      </div>
+      <div id="output" class="output">
+        <div class="placeholder">
+          <p>Le document structuré apparaîtra ici : synthèse, mots-clés, sommaire, points d'attention, données repérées (dates, montants, contacts) et contenu réorganisé par sections.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    Traitement entièrement local dans votre navigateur. Fermez l'onglet ou cliquez sur « Tout effacer » pour supprimer les données de la mémoire.
+  </footer>
+
+  <script src="js/zip.js"></script>
+  <script src="js/parsers.js"></script>
+  <script src="js/analyzer.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
